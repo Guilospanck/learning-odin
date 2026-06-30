@@ -25,5 +25,4 @@ main :: proc() {
 	// This doesn't work because there would be a precision loss of
 	// converting from floating point to an integer.
 	// y: int = 1.1
-
 }
