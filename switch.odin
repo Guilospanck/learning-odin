@@ -112,6 +112,4 @@ main :: proc() {
 	// Default case
 	// In this case, it is `nil`
     }
-
-
 }
