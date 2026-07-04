@@ -12,6 +12,19 @@ append(&my_dynamic_array, 11, 22, 33)
 // can also append slices
 some_slice := []int{20, 30}
 append(&my_dynamic_array, ..some_slice[:])
+
+// you can either delete a dynamic array (or slice - not a literal one)
+a := make([]int, 6) // len(a) == 6
+delete(a)
+delete(my_dynamic_array)
+
+// or you can `clear` it.
+// The difference is that deleting you also free the underlying memory,
+// so you can't reuse it. 
+// `clear`ing an array you are only setting its length to zero, but still its
+// capacity is the same, so the reserver memory remains.
+clear(&my_dynamic_array)
+
 ```
 
 - basically an ArrayList;
