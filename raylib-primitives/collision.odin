@@ -119,6 +119,14 @@ draw_gizmo :: proc() {
   )
 }
 
+draw_sphere_on_ray_hit :: proc(camera: rl.Camera3D, box_collision: rl.BoundingBox) {
+  ray := rl.GetScreenToWorldRay(rl.GetMousePosition(), camera)
+  ray_collision := rl.GetRayCollisionBox(ray, box_collision)
+  if ray_collision.hit {
+    rl.DrawSphere(ray_collision.point, 0.3, rl.RED)
+  }
+}
+
 main :: proc() {
   WIDTH :: 1400
   HEIGHT :: 850
@@ -211,6 +219,9 @@ main :: proc() {
       draw_gizmo()
 
       rl.DrawGrid(10, TILE_SIZE)
+
+      draw_sphere_on_ray_hit(camera, wall_box)
+
     }
     rl.EndMode3D()
 
