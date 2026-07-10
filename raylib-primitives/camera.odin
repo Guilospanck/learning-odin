@@ -3,6 +3,21 @@ package raylib_primitives
 import "core:math"
 import rl "vendor:raylib"
 
+/*
+
+From [OpenGL](https://learnopengl.com/Getting-started/Camera)
+
+"To define a camera we need its position in world space, the direction it's looking at, a vector pointing to the right and a vector pointing upwards from the camera"
+
+- to define the direction it is looking at (forward vector), we need `pitch` and `yaw`;
+- to define the right vector, we need `yaw`;
+- to define the up vector, we need the right vector x forward vector.
+
+
+Therefore the minimum to define a camera is this struct.
+
+NOTE:  in OpenGL, the positive z (+z) is getting OUT of the camera in direction to us, therefore we need to negate the forward vector coordinates when calculating movements and stuff like that.
+*/
 Camera :: struct {
   position: rl.Vector3,
   pitch:    f32,
@@ -136,6 +151,43 @@ rotate :: proc(camera: ^Camera) {
 
   // Clamps at [0, 2pi) just so the yaw doesn't grow undefinitely, but not a bug per-se
   camera.yaw = rl.Clamp(camera.yaw, 0, 2 * math.PI - TOLERANCE)
+}
+
+/*
+
+A matrix that is composed by vectors that are orthogonals (they form
+90deg between each other) and are unit vectors (length 1) is called
+ORTHONORMAL.
+
+For an orthonormal matrix, its inverse is the same as its transpose:
+
+            A^(-1) = A^t
+
+            right_vector = r (coordinate x)
+            up_vector = u (coordinate y)
+            forward_vector = f (coordinate Z)
+ 
+
+            |rx ux fx|
+        A = |ry uy fy|
+            |rz uz fz|
+
+
+        A * A^t = I
+
+
+A VIEW MATRIX is a matrix that brings points from the World Coordinate System
+into the Camera's view.
+
+It's defined by:
+
+          View = 
+
+
+
+*/
+look_at :: proc() {
+  unimplemented()
 }
 
 @(private)

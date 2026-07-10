@@ -9,7 +9,24 @@ calculate_vector_magnitude :: proc(v: rl.Vector3) -> f32 {
   return math.sqrt_f32(math.pow_f32(v.x, 2) + math.pow_f32(v.y, 2) + math.pow_f32(v.z, 2))
 }
 
+/*
+
+A dot product is defined by:
+
+    a * b
+    = b * a                         (it's symmetric)
+    = a.x*b.x + a.y*b.y + a.z*b.z
+    = |a| * |b| * cos(theta)        (theta is the angle between the vectors)
+
+Therefore, when one of the vectors is a unit vector (let's say vector b),
+we have |b| = 1, then:
+
+    a * b = |a| * cos(theta)
+
+    which means "the shadow that vector a casts on the axis of (same direction of) vector b"
+
 // NOTE: you could also use `rl.Vector3DotProduct(a, b)`
+*/
 calculate_dot_product :: proc(a, b: rl.Vector3) -> f32 {
   /*
 
