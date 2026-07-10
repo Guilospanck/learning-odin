@@ -110,6 +110,8 @@ leave the y-axis direction (SPACE, LEFT-SHIFT) as normal.
 
 SPEED :: 2.0
 
+SENSITIVITY_RAD_S :: 0.003
+
 move :: proc(camera: ^Camera, position: rl.Vector3) {
   position := position
   if calculate_vector_magnitude(position) != 0 {
@@ -119,6 +121,21 @@ move :: proc(camera: ^Camera, position: rl.Vector3) {
   dt := rl.GetFrameTime()
 
   camera.position += position * SPEED * dt
+}
+
+rotate :: proc(camera: ^Camera) {
+  delta := rl.GetMouseDelta()
+
+  camera.yaw += delta.x * SENSITIVITY_RAD_S
+  camera.pitch += delta.y * SENSITIVITY_RAD_S
+
+  TOLERANCE :: 0.01
+
+  // prevent gimbal lock (-+90deg -+tolerance)
+  camera.pitch = rl.Clamp(camera.pitch, -math.PI / 2 + TOLERANCE, math.PI / 2 - TOLERANCE)
+
+  // Clamps at [0, 2pi) just so the yaw doesn't grow undefinitely, but not a bug per-se
+  camera.yaw = rl.Clamp(camera.yaw, 0, 2 * math.PI - TOLERANCE)
 }
 
 @(private)
