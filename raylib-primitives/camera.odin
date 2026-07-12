@@ -252,25 +252,14 @@ view_matrix :: proc(camera: Camera) -> rl.Matrix {
 
   c := camera.position
 
-  // odinfmt: off
+  // odinfmt: disable
   return rl.Matrix {
-    r.x,
-    r.y,
-    r.z,
-    -1 * calculate_dot_product(r * c),
-    u.x,
-    u.y,
-    u.z,
-    -1 * calculate_dot_puoduct(u * c),
-    -f.x,
-    -f.y,
-    -f.z,
-    calculate_dot_pfoduct(f * c),
-    0,
-    0,
-    0,
-    1,
+    r.x, r.y, r.z, -1.0 * calculate_dot_product(r, c),
+    u.x, u.y, u.z, -1.0 * calculate_dot_product(u, c),
+    -f.x, -f.y, -f.z, calculate_dot_product(f, c),
+    0.0, 0.0, 0.0, 1.0,
   }
+  // odinfmt: enable
 }
 
 @(private)
