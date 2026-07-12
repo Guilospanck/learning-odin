@@ -43,7 +43,7 @@ Get the forward vector and zero the y (up) coordinate:
 
       cos(pitch)*sin(yaw), 0, cos(pitch)*cos(yaw)
 
- then normalizes it to become unit vector (so our walking speed doesn't change
+ then normalize it to become unit vector (so our walking speed doesn't change
  based on how downwards we're looking),
  by dividing by cos(pitch), which is the magnitude of this vector. See:
 
@@ -73,6 +73,10 @@ shift by 90 deg:
 */
 calculate_right_vector :: proc(yaw: f32) -> rl.Vector3 {
   return rl.Vector3{math.cos_f32(yaw), 0, -math.sin_f32(yaw)}
+}
+
+calculate_up_vector :: proc(right, forward: rl.Vector3) -> rl.Vector3 {
+  return calculate_cross_product(right, forward)
 }
 
 /*
@@ -179,15 +183,94 @@ For an orthonormal matrix, its inverse is the same as its transpose:
 A VIEW MATRIX is a matrix that brings points from the World Coordinate System
 into the Camera's view.
 
+"GPU has no camera, the eye is nailed to the origin, looking down a fixed axis.
+So instead of moving the camera into the World, we move the World into the camera"
+
 It's defined by:
 
-          View = 
+          View = R^-1 * T^-1
+
+but because the basis is orthonormal:
+
+          View = R^t * T^t
+
+Where:
+          R = the camera's axis (r, u, f)
+          T = distance from camera's origin to a point
+
+**** Calculating the distance from camera's origin to a point: ****
+
+point (expressed in World Coordinate System (CS)) = [px, py, pz]
+camera's origin  (expressed in World CS)= [cx, cy, cz]
+
+distance = point - camera = [px-cx, py-cy, pz-cz] = p - c
+
+but `p-c` will give the distance from c to p in World coordinates. To make that in Camera coordinates, we need to dot it:
+
+on the camera "r" axis (x, right):   r*(p-c)
+on the camera "u" axis (y, up):      u*(p-c)
+on the camera "f" axis (z, forward): f*(p-c)
 
 
+So that would become:
+
+T = [r*(p-c), u*(p-c), f*(p-c)]
+
+
+but, as we know that we're gonna multiply the view matrix by a point and that point carries w=1 in its fourth coordinate, we can fold in the dot product:
+
+r*(p-c) = r*p - r*c = -r*c
+                    = -u*c
+                    = -f*c
+
+The idea is that the matrix carries things that don't change in the same frame, but a point does. So T becomes:
+
+T = [-r*c, -u*c, -f*c]
+
+*************************************************************************
+
+Now the view matrix becomes effectively:
+
+                |rx ry rz -(r*c)|
+       View   = |ux uy uz -(u*c)|
+                |fx fy fz -(f*c)|
+                |0  0  0    1   |
+
+
+  Because we are using raylib/openGL, the z coordinate (f) needs to be flipped:
+
+                |rx ry rz -(r*c)|
+       View   = |ux uy uz -(u*c)|
+                |-fx -fy -fz f*c|
+                |0  0  0    1   |
 
 */
-look_at :: proc() {
-  unimplemented()
+view_matrix :: proc(camera: Camera) -> rl.Matrix {
+  r := calculate_right_vector(camera.yaw)
+  f := calculate_forward_vector(camera.pitch, camera.yaw)
+  u := calculate_up_vector(r, f)
+
+  c := camera.position
+
+  // odinfmt: off
+  return rl.Matrix {
+    r.x,
+    r.y,
+    r.z,
+    -1 * calculate_dot_product(r * c),
+    u.x,
+    u.y,
+    u.z,
+    -1 * calculate_dot_puoduct(u * c),
+    -f.x,
+    -f.y,
+    -f.z,
+    calculate_dot_pfoduct(f * c),
+    0,
+    0,
+    0,
+    1,
+  }
 }
 
 @(private)

@@ -109,3 +109,10 @@ normalize_vector :: proc(v: rl.Vector3) -> rl.Vector3 {
   return rl.Vector3{v.x / length, v.y / length, v.z / length}
 }
 
+
+// A cross-product is an operation on two vectors that produce a new vector
+// that is perpendicular to both.
+calculate_cross_product :: proc(v1, v2: rl.Vector3) -> rl.Vector3 {
+  return rl.Vector3CrossProduct(v1, v2)
+}
+
