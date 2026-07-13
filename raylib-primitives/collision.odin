@@ -1,6 +1,7 @@
 package raylib_primitives
 
 import rl "vendor:raylib"
+import rlgl "vendor:raylib/rlgl"
 
 TILE_SIZE :: 1.0
 
@@ -134,7 +135,6 @@ main :: proc() {
   rl.InitWindow(WIDTH, HEIGHT, "quadtree based collision detection")
   defer rl.CloseWindow()
 
-  camera := my_camera()
 
   player_unit := Unit {
     position   = {-4.0, 1.0, -4.0},
@@ -206,24 +206,33 @@ main :: proc() {
     rl.BeginDrawing()
     rl.ClearBackground(rl.RAYWHITE)
 
-    rl.BeginMode3D(camera)
-    {
-      // Draw wall
-      // rl.DrawCubeV(wall.position, wall.size, rl.GRAY)
-      rl.DrawCubeWiresV(wall.position, wall.size, rl.BLACK)
+    // camera := my_camera()
+    // rl.BeginMode3D(camera)
 
-      // Draw player
-      rl.DrawCubeV(player_unit.position, player_unit.size, player_unit.colour)
-      rl.DrawCubeWiresV(player_unit.position, player_unit.size, rl.BLACK)
 
-      draw_gizmo()
+    camera := new_camera()
+    view := view_matrix(camera)
+    projection := projection_matrix()
 
-      rl.DrawGrid(10, TILE_SIZE)
+    // set MVP matrix
+    rlgl.SetMatrixProjection(projection)
+    rlgl.SetMatrixModelview(view)
 
-      draw_sphere_on_ray_hit(camera, wall_box)
+    // Draw wall
+    // rl.DrawCubeV(wall.position, wall.size, rl.GRAY)
+    rl.DrawCubeWiresV(wall.position, wall.size, rl.BLACK)
 
-    }
-    rl.EndMode3D()
+    // Draw player
+    rl.DrawCubeV(player_unit.position, player_unit.size, player_unit.colour)
+    rl.DrawCubeWiresV(player_unit.position, player_unit.size, rl.BLACK)
+
+    draw_gizmo()
+
+    rl.DrawGrid(10, TILE_SIZE)
+
+    // draw_sphere_on_ray_hit(camera, wall_box)
+
+    // rl.EndMode3D()
 
     rl.DrawFPS(10, 10)
 

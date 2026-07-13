@@ -20,9 +20,12 @@ NOTE:  in OpenGL, the positive z (+z) is getting OUT of the camera in direction 
 */
 Camera :: struct {
   position: rl.Vector3,
-  pitch:    f32,
-  yaw:      f32,
+  pitch:    f32, // radians
+  yaw:      f32, // radians
 }
+
+SPEED :: 2.0
+SENSITIVITY_RAD_S :: 0.003
 
 
 calculate_forward_vector :: proc(pitch, yaw: f32) -> rl.Vector3 {
@@ -127,13 +130,9 @@ leave the y-axis direction (SPACE, LEFT-SHIFT) as normal.
 */
 
 
-SPEED :: 2.0
-
-SENSITIVITY_RAD_S :: 0.003
-
 move :: proc(camera: ^Camera, position: rl.Vector3) {
   position := position
-  if calculate_vector_magnitude(position) != 0 {
+  if calculate_vector_magnitude(position) != 0 {   // prevents divide-by-zero
     position = normalize_vector(position)
   }
 
@@ -262,6 +261,17 @@ view_matrix :: proc(camera: Camera) -> rl.Matrix {
   // odinfmt: enable
 }
 
+projection_matrix :: proc() -> rl.Matrix {
+  // odinfmt: disable
+  return rl.Matrix {
+    1.0, 0.0, 0.0, 0.0,
+    0.0, 1.0, 0.0, 0.0,
+    0.0, 0.0, 1.0, 0.0,
+    0.0, 0.0, 1.0, 0.0,
+  }
+  // odinfmt: enable
+}
+
 @(private)
 my_camera :: proc() -> rl.Camera3D {
   camera := rl.Camera3D {
@@ -273,5 +283,16 @@ my_camera :: proc() -> rl.Camera3D {
   }
 
   return camera
+}
+
+@(private)
+new_camera :: proc() -> Camera {
+  // odinfmt: disable
+  return Camera {
+    position = {0.0, 10.0, 10.0},
+    pitch = 0.0,
+    yaw = 0.0,
+  }
+  // odinfmt: enable
 }
 
