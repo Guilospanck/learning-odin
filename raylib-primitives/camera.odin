@@ -79,7 +79,20 @@ calculate_right_vector :: proc(yaw: f32) -> rl.Vector3 {
 }
 
 calculate_up_vector :: proc(right, forward: rl.Vector3) -> rl.Vector3 {
-  return calculate_cross_product(right, forward)
+  /*
+
+  x × y =  z
+  y × z =  x
+  z × x =  y
+
+  if you swap the order:
+
+  y × x = -z
+  z × y = -x
+  x × z = -y
+
+  */
+  return calculate_cross_product(forward, right)
 }
 
 /*
@@ -289,7 +302,7 @@ my_camera :: proc() -> rl.Camera3D {
 new_camera :: proc() -> Camera {
   // odinfmt: disable
   return Camera {
-    position = {0.0, 10.0, 10.0},
+    position = {0.0, 10.0, 20.0},
     pitch = 0.0,
     yaw = 0.0,
   }

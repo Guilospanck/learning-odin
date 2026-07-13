@@ -1,5 +1,6 @@
 package raylib_primitives
 
+import "core:fmt"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 
@@ -158,6 +159,13 @@ main :: proc() {
 
   rl.SetTargetFPS(60)
 
+  camera := new_camera()
+  view := view_matrix(camera)
+  projection := projection_matrix()
+
+  fmt.println(view)
+  fmt.println(projection)
+
   for !rl.WindowShouldClose() {
     // Move player
     if rl.IsKeyDown(.RIGHT) || rl.IsKeyDown(.D) do player_unit.position.x += player_unit.speed
@@ -209,10 +217,6 @@ main :: proc() {
     // camera := my_camera()
     // rl.BeginMode3D(camera)
 
-
-    camera := new_camera()
-    view := view_matrix(camera)
-    projection := projection_matrix()
 
     // set MVP matrix
     rlgl.SetMatrixProjection(projection)
