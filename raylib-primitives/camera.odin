@@ -25,8 +25,14 @@ Camera :: struct {
   fovy:     f32, // radians
 }
 
+CameraMode :: enum {
+  First_Person,
+  Third_Person,
+}
+
 SPEED: f32 : 2.0
 SENSITIVITY_RAD_S: f32 : 0.3
+SENSITIVITY_MOUSE_RAD_S: f32 : 0.003
 NEAR_PLANE: f32 : 0.1
 FAR_PLANE: f32 : 100.0
 
@@ -250,7 +256,7 @@ calculate_fovy_focal_length :: proc(fovy: f32) -> f32 {
 Because the fovy is vertical, when laying it on the y-axis it already works correctly
 to fit the [-1, +1] NDC cube.
 
-But, when that happens, we still need to pre-cancel the stretch that would happen
+But, when that happens, we still need to pre-cancel the sggtretch that would happen
 with the x-axis, so for that we need the aspect ratio, which would then be used
 as f/a when setting the x coordinate for the projection matrix.
 
@@ -397,7 +403,7 @@ leave the y-axis direction (SPACE, LEFT-SHIFT) as normal.
 */
 
 
-move :: proc(camera: ^Camera, position: rl.Vector3) {
+move_camera :: proc(camera: ^Camera, position: rl.Vector3) {
   position := position
   if calculate_vector_magnitude(position) != 0 {   // prevents divide-by-zero
     position = normalize_vector(position)
@@ -408,30 +414,20 @@ move :: proc(camera: ^Camera, position: rl.Vector3) {
   camera.position += position * SPEED * dt
 }
 
-rotate :: proc(camera: ^Camera) {
+rotate_camera :: proc(camera: ^Camera, apply_tolerance: bool = false) {
   delta := rl.GetMouseDelta()
 
-  camera.yaw += delta.x * SENSITIVITY_RAD_S
-  camera.pitch += delta.y * SENSITIVITY_RAD_S
+  camera.yaw += -1 * delta.x * SENSITIVITY_MOUSE_RAD_S
+  camera.pitch += delta.y * SENSITIVITY_MOUSE_RAD_S
 
-  TOLERANCE :: 0.01
+  if apply_tolerance {
+    TOLERANCE :: 0.01
 
-  // prevent gimbal lock (-+90deg -+tolerance)
-  camera.pitch = rl.Clamp(camera.pitch, -math.PI / 2 + TOLERANCE, math.PI / 2 - TOLERANCE)
+    // prevent gimbal lock (-+90deg -+tolerance)
+    camera.pitch = rl.Clamp(camera.pitch, -math.PI / 2 + TOLERANCE, math.PI / 2 - TOLERANCE)
 
-  // Clamps at [0, 2pi) just so the yaw doesn't grow undefinitely, but not a bug per-se
-  camera.yaw = rl.Clamp(camera.yaw, 0, 2 * math.PI - TOLERANCE)
-}
-
-@(private)
-new_camera :: proc() -> Camera {
-  // odinfmt: disable
-  return Camera {
-    position = {0.0, 10.0, 10.0},
-    pitch = math.PI/4,
-    yaw = 0.0,
-    fovy = math.PI / 4, // 45deg 
+    // Clamps at [-pi, pi) just so the yaw doesn't grow undefinitely, but not a bug per-se
+    camera.yaw = rl.Clamp(camera.yaw, -1 * math.PI + TOLERANCE, math.PI - TOLERANCE)
   }
-  // odinfmt: enable
 }
 

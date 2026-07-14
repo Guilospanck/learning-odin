@@ -7,8 +7,8 @@ import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 
 TILE_SIZE :: 1.0
-WIDTH :: 1400
-HEIGHT :: 850
+WIDTH :: 1920
+HEIGHT :: 1080
 
 Unit :: struct {
   position:     rl.Vector3,
@@ -52,20 +52,53 @@ resolve_collision :: proc(unit: ^Unit, obstacle: rl.Vector3) {
   }
 }
 
-process_input :: proc(camera: ^Camera, player_unit: ^Unit) {
+process_input :: proc(camera: ^Camera, player_unit: ^Unit, camera_mode: ^CameraMode) {
+  if rl.IsKeyDown(.LEFT_SHIFT) do rotate_camera(camera)
+
+  // change camera mode
+  if rl.IsKeyPressed(.Q) {
+    if camera_mode^ == CameraMode.First_Person {
+      camera_mode^ = CameraMode.Third_Person
+      camera.position = {
+        player_unit.position.x,
+        player_unit.position.y + 10.0,
+        player_unit.position.z + 10.0,
+      }
+      camera.yaw = 0.0
+      camera.pitch = math.PI / 4
+    } else {
+      camera_mode^ = CameraMode.First_Person
+      camera.position = player_unit.position
+      camera.yaw = 0.0
+      camera.pitch = 0.0
+    }
+  }
+
   dt := rl.GetFrameTime()
 
-  // Move camera
+  // Rotate camera
   if rl.IsKeyDown(.UP) do camera.pitch -= SENSITIVITY_RAD_S * dt
   if rl.IsKeyDown(.DOWN) do camera.pitch += SENSITIVITY_RAD_S * dt
   if rl.IsKeyDown(.LEFT) do camera.yaw += SENSITIVITY_RAD_S * dt
   if rl.IsKeyDown(.RIGHT) do camera.yaw -= SENSITIVITY_RAD_S * dt
 
-  // Move player
-  if rl.IsKeyDown(.W) do player_unit.position.z -= player_unit.speed
-  if rl.IsKeyDown(.A) do player_unit.position.x -= player_unit.speed
-  if rl.IsKeyDown(.S) do player_unit.position.z += player_unit.speed
-  if rl.IsKeyDown(.D) do player_unit.position.x += player_unit.speed
+  // Move player and camera
+  if rl.IsKeyDown(.W) {
+    player_unit.position.z -= player_unit.speed
+    camera.position.z -= player_unit.speed
+  }
+  if rl.IsKeyDown(.A) {
+    player_unit.position.x -= player_unit.speed
+    camera.position.x -= player_unit.speed
+  }
+  if rl.IsKeyDown(.S) {
+    player_unit.position.z += player_unit.speed
+    camera.position.z += player_unit.speed
+  }
+  if rl.IsKeyDown(.D) {
+    player_unit.position.x += player_unit.speed
+    camera.position.x += player_unit.speed
+  }
 }
 
 draw_gizmo :: proc() {
@@ -130,20 +163,27 @@ main :: proc() {
     colour   = rl.GRAY,
   }
 
-  collision := false
+  camera := Camera {
+    position = {-4.0, 1.0, -4.0},
+    pitch    = 0.0,
+    yaw      = 0.0,
+    fovy     = math.PI / 4, // 45deg
+  }
 
-  rl.SetTargetFPS(60)
+  camera_mode := CameraMode.First_Person
 
-  camera := new_camera()
   projection := projection_matrix(camera.fovy, WIDTH, HEIGHT)
 
   // These are used for the 2D pass
   default_proj := rlgl.GetMatrixProjection()
   default_view := rlgl.GetMatrixModelview()
 
+  collision := false
+
+  rl.SetTargetFPS(60)
+
+
   for !rl.WindowShouldClose() {
-
-
     collision = false
 
     // Check collisions player vs wall
@@ -182,7 +222,8 @@ main :: proc() {
       player_unit.colour = rl.GREEN
     }
 
-    process_input(&camera, &player_unit)
+    process_input(&camera, &player_unit, &camera_mode)
+
     view := view_matrix(camera)
 
     rl.BeginDrawing()
@@ -203,7 +244,7 @@ main :: proc() {
     rl.DrawCubeWiresV(player_unit.position, player_unit.size, rl.BLACK)
 
     draw_gizmo()
-    rl.DrawGrid(10, TILE_SIZE)
+    rl.DrawGrid(100, TILE_SIZE)
     // draw_sphere_on_ray_hit(camera, wall_box)
 
     rlgl.DrawRenderBatchActive() // flush 3D geometry with 3D matrices
