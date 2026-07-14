@@ -22,6 +22,7 @@ Camera :: struct {
   position: rl.Vector3,
   pitch:    f32, // radians
   yaw:      f32, // radians
+  fov:      f32, // radians
 }
 
 SPEED :: 2.0
@@ -274,13 +275,75 @@ view_matrix :: proc(camera: Camera) -> rl.Matrix {
   // odinfmt: enable
 }
 
+/*
+
+
+When you have a field of view (fov), you can calculate the constant that goes
+into the projection matrix.
+
+Remember:
+          / 
+        /           |
+      /             | screen_height (in world coordinates)
+     / ) fov/2      |
+eye o - - - - - - - - - - -> depth (d)
+     \ ) fov/2
+      \
+       \
+        \
+
+        tan(fov/2) = screen_height / d
+        screen_height = tan(fov/2) * d
+
+>>> but Yndc (normalized device coordinates for y) needs to be [-1, +1], therefore
+
+        Yndc = some_point_height (in world coordinates) / screen_height = +1
+
+>>> And replacing the values:
+
+        Yndc = some_point_height / tan(fov/2) * d
+        Yndc = some_point_height * 1/d * 1/tan(fov/2)
+
+
+    where:
+    - some_point_height: the "y" coordinate of some vertex that we're gonna multiply for
+    - 1/tan(fov/2): the focal length constant (f). Lives in the projection matrix
+    - 1/d: automatically done by the GPU when we equal `w` to `z`
+
+>>> when Yndc > |1|, it lands outside of the screen and therefore it gets clipped
+
+*/
+calculate_fov_focal_length :: proc(fov: f32) -> f32 {
+  return 1.0 / math.tan_f32(fov / 2)
+}
+
+/*
+
+ The GPU wants points inside a cube [-1, 1](x, y, z) that's called 
+ "Normalized Device Coordinates" (NDC).
+
+ With a perspective projection matrix, we want to solve basically 3 problems:
+
+ - the x and y rows (1st and 2nd): we want to shrink sideways position by depth (perspective) and scale by field of view (fov), so the visible width maps to [-1, +1].
+
+ - the z row (3rd): it's the depth. It will remap it from [near, far plane] to [-1, +1]
+
+
+ - the w row (4th): copy depth into `w` so the hardware divides by depth. By having the fourth row, third column as 1.0, it will generate [x, y, z, z] (therefore the w coordinate is z: `w = z`), which the GPU will use to divide everything by w: 
+
+ [x/w, y/w, z/w, w/w] => [x/z, y/z, z/z, z/z] => [x/z, y/z, 1, 1] (divide by depth)
+
+*/
 projection_matrix :: proc() -> rl.Matrix {
+
+  f := calculate_fov_focal_length(math.PI / 2)
+
   // odinfmt: disable
   return rl.Matrix {
     1.0, 0.0, 0.0, 0.0,
     0.0, 1.0, 0.0, 0.0,
     0.0, 0.0, 1.0, 0.0,
-    0.0, 0.0, 1.0, 0.0,
+    0.0, 0.0, 1.0, 0.0, 
   }
   // odinfmt: enable
 }

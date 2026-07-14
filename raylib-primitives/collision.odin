@@ -217,7 +217,6 @@ main :: proc() {
     // camera := my_camera()
     // rl.BeginMode3D(camera)
 
-
     // set MVP matrix
     rlgl.SetMatrixProjection(projection)
     rlgl.SetMatrixModelview(view)
@@ -235,7 +234,6 @@ main :: proc() {
     rl.DrawGrid(10, TILE_SIZE)
 
     // draw_sphere_on_ray_hit(camera, wall_box)
-
     // rl.EndMode3D()
 
     rl.DrawFPS(10, 10)
