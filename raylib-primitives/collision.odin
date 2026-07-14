@@ -1,10 +1,14 @@
 package raylib_primitives
 
 import "core:fmt"
+import "core:math"
+import "core:strings"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 
 TILE_SIZE :: 1.0
+WIDTH :: 1400
+HEIGHT :: 850
 
 Unit :: struct {
   position:     rl.Vector3,
@@ -48,48 +52,21 @@ resolve_collision :: proc(unit: ^Unit, obstacle: rl.Vector3) {
   }
 }
 
-// process_input :: proc(time_delta: f32, camera: ^rl.Camera3D) {
-//   if rl.IsKeyDown(.UP) {
-//     camera.x += camera.speed * math.cos(camera.angle) * time_delta
-//     camera.y += camera.speed * math.sin(camera.angle) * time_delta
-//   }
-//   if rl.IsKeyDown(.DOWN) {
-//     camera.x -= camera.speed * math.cos(camera.angle) * time_delta
-//     camera.y -= camera.speed * math.sin(camera.angle) * time_delta
-//   }
-//   if rl.IsKeyDown(.LEFT) {
-//     camera.angle -= camera.rotspeed * time_delta
-//   }
-//   if rl.IsKeyDown(.RIGHT) {
-//     camera.angle += camera.rotspeed * time_delta
-//   }
-//   if rl.IsKeyDown(.Q) {
-//     camera.height += camera.heightspeed * time_delta
-//   }
-//   if rl.IsKeyDown(.E) {
-//     camera.height -= camera.heightspeed * time_delta
-//   }
-//   if rl.IsKeyDown(.W) {
-//     camera.horizon += camera.horizonspeed * time_delta
-//   }
-//   if rl.IsKeyDown(.S) {
-//     camera.horizon -= camera.horizonspeed * time_delta
-//   }
-//   if rl.IsKeyDown(.A) {
-//     camera.tilt -= camera.tiltspeed * time_delta
-//     camera.tilt = camera.tilt < -1 ? -1 : camera.tilt
-//   }
-//   if rl.IsKeyDown(.D) {
-//     camera.tilt += camera.tiltspeed * time_delta
-//     camera.tilt = camera.tilt > 1 ? 1 : camera.tilt
-//   }
-//   if rl.IsKeyDown(.R) {
-//     camera.angle = 1.5 * math.PI
-//     camera.tilt = 0
-//     camera.height = 150
-//     camera.horizon = 100
-//   }
-// }
+process_input :: proc(camera: ^Camera, player_unit: ^Unit) {
+  dt := rl.GetFrameTime()
+
+  // Move camera
+  if rl.IsKeyDown(.UP) do camera.pitch -= SENSITIVITY_RAD_S * dt
+  if rl.IsKeyDown(.DOWN) do camera.pitch += SENSITIVITY_RAD_S * dt
+  if rl.IsKeyDown(.LEFT) do camera.yaw += SENSITIVITY_RAD_S * dt
+  if rl.IsKeyDown(.RIGHT) do camera.yaw -= SENSITIVITY_RAD_S * dt
+
+  // Move player
+  if rl.IsKeyDown(.W) do player_unit.position.z -= player_unit.speed
+  if rl.IsKeyDown(.A) do player_unit.position.x -= player_unit.speed
+  if rl.IsKeyDown(.S) do player_unit.position.z += player_unit.speed
+  if rl.IsKeyDown(.D) do player_unit.position.x += player_unit.speed
+}
 
 draw_gizmo :: proc() {
   radius: f32 = 0.05
@@ -130,8 +107,6 @@ draw_sphere_on_ray_hit :: proc(camera: rl.Camera3D, box_collision: rl.BoundingBo
 }
 
 main :: proc() {
-  WIDTH :: 1400
-  HEIGHT :: 850
 
   rl.InitWindow(WIDTH, HEIGHT, "quadtree based collision detection")
   defer rl.CloseWindow()
@@ -160,18 +135,14 @@ main :: proc() {
   rl.SetTargetFPS(60)
 
   camera := new_camera()
-  view := view_matrix(camera)
   projection := projection_matrix(camera.fovy, WIDTH, HEIGHT)
 
-  fmt.println("View: ", view)
-  fmt.println("Projection: ", projection)
+  // These are used for the 2D pass
+  default_proj := rlgl.GetMatrixProjection()
+  default_view := rlgl.GetMatrixModelview()
 
   for !rl.WindowShouldClose() {
-    // Move player
-    if rl.IsKeyDown(.RIGHT) || rl.IsKeyDown(.D) do player_unit.position.x += player_unit.speed
-    if rl.IsKeyDown(.LEFT) || rl.IsKeyDown(.A) do player_unit.position.x -= player_unit.speed
-    if rl.IsKeyDown(.DOWN) || rl.IsKeyDown(.S) do player_unit.position.z += player_unit.speed
-    if rl.IsKeyDown(.UP) || rl.IsKeyDown(.W) do player_unit.position.z -= player_unit.speed
+
 
     collision = false
 
@@ -211,11 +182,13 @@ main :: proc() {
       player_unit.colour = rl.GREEN
     }
 
+    process_input(&camera, &player_unit)
+    view := view_matrix(camera)
+
     rl.BeginDrawing()
     rl.ClearBackground(rl.RAYWHITE)
 
-    // camera := my_camera()
-    // rl.BeginMode3D(camera)
+    /***** 3D pass *****/
 
     // set MVP matrix
     rlgl.SetMatrixProjection(projection)
@@ -230,13 +203,30 @@ main :: proc() {
     rl.DrawCubeWiresV(player_unit.position, player_unit.size, rl.BLACK)
 
     draw_gizmo()
-
     rl.DrawGrid(10, TILE_SIZE)
-
     // draw_sphere_on_ray_hit(camera, wall_box)
-    // rl.EndMode3D()
+
+    rlgl.DrawRenderBatchActive() // flush 3D geometry with 3D matrices
+
+    /***** 2D pass *******/
+
+    // Restore 2D matrices for drawing 2D
+    rlgl.SetMatrixProjection(default_proj)
+    rlgl.SetMatrixModelview(default_view)
 
     rl.DrawFPS(10, 10)
+
+    // draw camera angles
+    // NOTE: uses a buffer so we prevent flickering
+    buf: [256]byte
+    s := fmt.bprintf(
+      buf[:],
+      "Camera angles:\n\nyaw = %.1fdeg\n\npitch = %.1fdeg",
+      math.to_degrees_f32(camera.yaw),
+      math.to_degrees_f32(camera.pitch),
+    )
+    camera_angles_text := strings.clone_to_cstring(s, context.temp_allocator)
+    draw_ui_text(text = camera_angles_text, margin = 60, position = .Top_Right)
 
     // Draw position text
     player_pos_text := rl.TextFormat(
@@ -245,8 +235,10 @@ main :: proc() {
       player_unit.position.y,
       player_unit.position.z,
     )
-    rl.DrawText(player_pos_text, 30, 30, 30, rl.DARKGRAY)
+    draw_ui_text(text = player_pos_text, margin = 30, position = .Top_Left)
     rl.EndDrawing()
+
+    free_all(context.temp_allocator)
   }
 }
 
