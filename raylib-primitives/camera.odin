@@ -25,9 +25,10 @@ Camera :: struct {
   fovy:     f32, // radians
 }
 
-SPEED :: 2.0
-SENSITIVITY_RAD_S :: 0.003
-
+SPEED: f32 : 2.0
+SENSITIVITY_RAD_S: f32 : 0.003
+NEAR_PLANE: f32 : 0.1
+FAR_PLANE: f32 : 100.0
 
 calculate_forward_vector :: proc(pitch, yaw: f32) -> rl.Vector3 {
   assert(
@@ -338,6 +339,57 @@ calculate_aspect_ratio :: proc(screen_width, screen_height: f32) -> f32 {
 
 /*
 
+  As we did with the first (x) and second (y) rows of the projection matrix, we need to also
+  do the same for the third row (z) to include them into the NDC cube [-1, +1] (x, y, z).
+
+  So the third row has the responsibility of mapping [near, far] -> [-1, 1]
+
+  The third row can only be [0 0 A B]. Remember that each coordinate gets divided
+  by w (or depth if w = z) by the GPU, but we don't want that in the depth (z) coordinate,
+  otherwise we would miss the whole depth purpose.
+
+  Therefore we must think of a way that would actually cancel that GPU division:
+
+  [0 0 A B] * | x |
+              | y |
+              | z |
+              | 1 |
+
+  then:
+
+  Zclip = A * z + B
+
+  but after division by depth, this would turn into:
+
+  Zndc = Zclip / w  = (Az + B) / z = A + B/z
+
+  (see how this follows a 1/z curve, which changes quickly when z is small
+  and settles when z is bigger, exactly how the near and far planes work)
+
+  At near plane:
+        z = near_plane => A + B/near_plane = -1
+
+  At far plane:
+        z = far_plane => A + B/far_plane = +1
+
+
+  You now have two equations. By subtracting one from another and then substituting afterwards,
+  you find the values for A and B:
+
+        A = - (near_plane + far_plane) / (near_plane - far_plane)
+        B = 2 * near_plane * far_plane / (near_plane - far_plane)
+
+
+*/
+calculate_z_clip_a_and_b :: proc() -> (f32, f32) {
+  A := -(NEAR_PLANE + FAR_PLANE) / (NEAR_PLANE - FAR_PLANE)
+  B := 2 * NEAR_PLANE * FAR_PLANE / (NEAR_PLANE - FAR_PLANE)
+
+  return A, B
+}
+
+/*
+
  The GPU wants points inside a cube [-1, 1](x, y, z) that's called 
  "Normalized Device Coordinates" (NDC).
 
@@ -355,14 +407,16 @@ calculate_aspect_ratio :: proc(screen_width, screen_height: f32) -> f32 {
 */
 projection_matrix :: proc(fovy, screen_width, screen_height: f32) -> rl.Matrix {
 
-  f := calculate_fovy_focal_length(fovy)
-  a := calculate_aspect_ratio(screen_width, screen_height)
+  focal_length := calculate_fovy_focal_length(fovy)
+  aspect_ratio := calculate_aspect_ratio(screen_width, screen_height)
+
+  a, b := calculate_z_clip_a_and_b()
 
   // odinfmt: disable
   return rl.Matrix {
-    f/a, 0.0, 0.0, 0.0, // x scale
-    0.0, f, 0.0, 0.0, // y scale
-    0.0, 0.0, 1.0, 0.0,
+    focal_length/aspect_ratio, 0.0, 0.0, 0.0, // x scale
+    0.0, focal_length, 0.0, 0.0, // y scale
+    0.0, 0.0, a, b,
     0.0, 0.0, 1.0, 0.0, 
   }
   // odinfmt: enable
