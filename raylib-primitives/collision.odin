@@ -161,10 +161,10 @@ main :: proc() {
 
   camera := new_camera()
   view := view_matrix(camera)
-  projection := projection_matrix()
+  projection := projection_matrix(camera.fovy, WIDTH, HEIGHT)
 
-  fmt.println(view)
-  fmt.println(projection)
+  fmt.println("View: ", view)
+  fmt.println("Projection: ", projection)
 
   for !rl.WindowShouldClose() {
     // Move player
