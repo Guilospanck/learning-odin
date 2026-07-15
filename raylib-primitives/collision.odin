@@ -130,36 +130,6 @@ process_input :: proc(camera: ^Camera, player_unit: ^Unit, camera_mode: ^CameraM
   camera.position = get_camera_position_based_on_camera_mode(camera_mode, player_unit)
 }
 
-draw_gizmo :: proc() {
-  radius: f32 = 0.05
-  sides: i32 = 8
-
-  rl.DrawCylinderEx(
-    rl.Vector3{0.0, 0.0, 0.0},
-    rl.Vector3{1.0, 0.0, 0.0},
-    radius,
-    radius,
-    sides,
-    rl.RED,
-  )
-  rl.DrawCylinderEx(
-    rl.Vector3{0.0, 0.0, 0.0},
-    rl.Vector3{0.0, 1.0, 0.0},
-    radius,
-    radius,
-    sides,
-    rl.GREEN,
-  )
-  rl.DrawCylinderEx(
-    rl.Vector3{0.0, 0.0, 0.0},
-    rl.Vector3{0.0, 0.0, 1.0},
-    radius,
-    radius,
-    sides,
-    rl.BLUE,
-  )
-}
-
 draw_sphere_on_ray_hit :: proc(camera: rl.Camera3D, box_collision: rl.BoundingBox) {
   ray := rl.GetScreenToWorldRay(rl.GetMousePosition(), camera)
   ray_collision := rl.GetRayCollisionBox(ray, box_collision)
@@ -189,7 +159,7 @@ main :: proc() {
     position = {0.0, 1.0, 0.0},
     size     = rl.Vector3(2.0),
     health   = 20,
-    colour   = rl.GRAY,
+    colour   = rl.YELLOW,
   }
 
   camera := Camera {
@@ -265,12 +235,10 @@ main :: proc() {
     rlgl.SetMatrixModelview(view)
 
     // Draw wall
-    // rl.DrawCubeV(wall.position, wall.size, rl.GRAY)
-    rl.DrawCubeWiresV(wall.position, wall.size, rl.BLACK)
+    draw_cube(wall.position, wall.size, wall.colour)
 
     // Draw player
-    rl.DrawCubeV(player_unit.position, player_unit.size, player_unit.colour)
-    rl.DrawCubeWiresV(player_unit.position, player_unit.size, rl.BLACK)
+    draw_cube(player_unit.position, player_unit.size, player_unit.colour)
 
     draw_gizmo()
     rl.DrawGrid(100, TILE_SIZE)
