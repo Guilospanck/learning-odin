@@ -11,44 +11,34 @@ WIDTH :: 1920
 HEIGHT :: 1080
 
 Unit :: struct {
-  position:     rl.Vector3,
-  yaw, pitch:   f32,
-  size:         rl.Vector3,
-  velocity:     rl.Vector3,
-  speed:        f32,
-  max_speed:    f32,
-  health:       int,
-  max_health:   int,
-  damage:       int,
-  is_active:    bool,
-  cooldown:     int,
-  can_attack:   bool,
-  attack_timer: int,
-  colour:       rl.Color,
+  position:   rl.Vector3,
+  yaw, pitch: f32,
+  size:       rl.Vector3,
+  colour:     rl.Color,
 }
 
 Wall :: struct {
-  position:  rl.Vector3,
-  size:      rl.Vector3,
-  health:    int,
-  is_active: bool,
-  colour:    rl.Color,
+  position: rl.Vector3,
+  size:     rl.Vector3,
+  colour:   rl.Color,
 }
 
 // Basically just cancels unit movement
 resolve_collision :: proc(unit: ^Unit, obstacle: rl.Vector3) {
+  dt := rl.GetFrameTime()
+
   // Collision resolution logic
   if unit.position.z < obstacle.z - 1 {   // player above
-    unit.position.z -= unit.speed
+    unit.position.z -= dt * SPEED
   }
   if unit.position.z > obstacle.z + 1 {   // player below
-    unit.position.z += unit.speed
+    unit.position.z += dt * SPEED
   }
   if unit.position.x < obstacle.x - 1 {   // player on left
-    unit.position.x -= unit.speed
+    unit.position.x -= dt * SPEED
   }
   if unit.position.x > obstacle.x + 1 {   // player on right
-    unit.position.x += unit.speed
+    unit.position.x += dt * SPEED
   }
 }
 
@@ -143,22 +133,17 @@ main :: proc() {
   rl.InitWindow(WIDTH, HEIGHT, "quadtree based collision detection")
   defer rl.CloseWindow()
 
+  PLAYER_DEFAULT_COLOR :: rl.GREEN
 
   player_unit := Unit {
-    position   = {-4.0, 1.0, -4.0},
-    size       = {1.0, 2.0, 1.0},
-    speed      = 0.1,
-    max_speed  = 0.5,
-    health     = 40,
-    max_health = 40,
-    damage     = 6,
-    colour     = rl.RED,
+    position = {-4.0, 1.0, -4.0},
+    size     = {1.0, 2.0, 1.0},
+    colour   = PLAYER_DEFAULT_COLOR,
   }
 
   wall := Wall {
     position = {0.0, 1.0, 0.0},
     size     = rl.Vector3(2.0),
-    health   = 20,
     colour   = rl.YELLOW,
   }
 
@@ -181,6 +166,18 @@ main :: proc() {
 
   rl.SetTargetFPS(60)
 
+  wall_box := rl.BoundingBox {
+    min = {
+      wall.position.x - wall.size.x / 2,
+      wall.position.y - wall.size.y / 2,
+      wall.position.z - wall.size.z / 2,
+    },
+    max = {
+      wall.position.x + wall.size.x / 2,
+      wall.position.y + wall.size.y / 2,
+      wall.position.z + wall.size.z / 2,
+    },
+  }
 
   for !rl.WindowShouldClose() {
     collision = false
@@ -199,18 +196,6 @@ main :: proc() {
       },
     }
 
-    wall_box := rl.BoundingBox {
-      min = {
-        wall.position.x - wall.size.x / 2,
-        wall.position.y - wall.size.y / 2,
-        wall.position.z - wall.size.z / 2,
-      },
-      max = {
-        wall.position.x + wall.size.x / 2,
-        wall.position.y + wall.size.y / 2,
-        wall.position.z + wall.size.z / 2,
-      },
-    }
 
     collision = rl.CheckCollisionBoxes(player_box, wall_box)
 
@@ -218,10 +203,11 @@ main :: proc() {
       player_unit.colour = rl.RED
       resolve_collision(&player_unit, wall.position)
     } else {
-      player_unit.colour = rl.GREEN
+      player_unit.colour = PLAYER_DEFAULT_COLOR
     }
 
     process_input(&camera, &player_unit, &camera_mode)
+
 
     view := view_matrix(camera)
 
@@ -241,8 +227,13 @@ main :: proc() {
     // Draw player
     draw_cube(player_unit.position, player_unit.size, player_unit.colour)
 
+    // Draw gizmo
     draw_gizmo()
+
+    // Draw grid
     rl.DrawGrid(100, TILE_SIZE)
+
+    // TODO: need to find a way now with the custom camera
     // draw_sphere_on_ray_hit(camera, wall_box)
 
     rlgl.DrawRenderBatchActive() // flush 3D geometry with 3D matrices

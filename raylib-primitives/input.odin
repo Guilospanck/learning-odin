@@ -68,7 +68,6 @@ leave the y-axis direction (SPACE, LEFT-SHIFT) as normal.
 
 
 move :: proc(yaw: f32, speed: f32 = SPEED) -> rl.Vector3 {
-
   walk_vector := calculate_walk_vector(yaw)
   right_vector := calculate_right_vector(yaw)
 
