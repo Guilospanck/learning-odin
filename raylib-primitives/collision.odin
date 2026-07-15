@@ -52,20 +52,21 @@ resolve_collision :: proc(unit: ^Unit, obstacle: rl.Vector3) {
   }
 }
 
-get_camera_position_based_on_players :: proc(
+get_camera_position_based_on_camera_mode :: proc(
   camera_mode: ^CameraMode,
   player_unit: ^Unit,
 ) -> rl.Vector3 {
 
   if camera_mode^ == CameraMode.Third_Person {
-    CAMERA_DISTANCE_TO_PLAYER_3RD_PERSON_VIEW: f32 : 10.0
+    CAMERA_Z_DISTANCE_TO_PLAYER_3RD_PERSON_VIEW: f32 : 15.0
+    CAMERA_Y_DISTANCE_TO_PLAYER_3RD_PERSON_VIEW: f32 : 2.0
 
     forward_vector := calculate_forward_vector(player_unit.pitch, player_unit.yaw)
 
     return(
       player_unit.position +
-      forward_vector * CAMERA_DISTANCE_TO_PLAYER_3RD_PERSON_VIEW +
-      {0, CAMERA_DISTANCE_TO_PLAYER_3RD_PERSON_VIEW, 0} \
+      forward_vector * CAMERA_Z_DISTANCE_TO_PLAYER_3RD_PERSON_VIEW +
+      {0, CAMERA_Y_DISTANCE_TO_PLAYER_3RD_PERSON_VIEW, 0} \
     )
   }
 
@@ -74,57 +75,59 @@ get_camera_position_based_on_players :: proc(
   return player_unit.position + {0, CAMERA_DISTANCE_TO_PLAYER_1ST_PERSON_VIEW, 0}
 }
 
-process_input :: proc(camera: ^Camera, player_unit: ^Unit, camera_mode: ^CameraMode) {
+toggle_camera_mode :: proc(camera_mode: ^CameraMode, camera: ^Camera, player_unit: ^Unit) {
+  if camera_mode^ == CameraMode.First_Person {
+    camera_mode^ = CameraMode.Third_Person
 
-  dt := rl.GetFrameTime()
+    camera.yaw = player_unit.yaw
+    camera.pitch = math.PI / 4 // 45 deg
 
-  // Rotate camera with mouse
-  pitch, yaw := rotate()
+  } else {
+    camera_mode^ = CameraMode.First_Person
 
-  // Rotate camera with keyboard
-  if rl.IsKeyDown(.UP) do pitch -= SENSITIVITY_RAD_S * dt
-  if rl.IsKeyDown(.DOWN) do pitch += SENSITIVITY_RAD_S * dt
-  if rl.IsKeyDown(.LEFT) do yaw += SENSITIVITY_RAD_S * dt
-  if rl.IsKeyDown(.RIGHT) do yaw -= SENSITIVITY_RAD_S * dt
-
-  // do not allow pitch on 3rd person view
-  if camera_mode^ != CameraMode.Third_Person {
-    camera.pitch += pitch
-    player_unit.pitch += pitch
+    camera.yaw = player_unit.yaw
+    camera.pitch = player_unit.pitch
   }
 
-  camera.yaw += yaw
-  player_unit.yaw += yaw
+  camera.position = get_camera_position_based_on_camera_mode(camera_mode, player_unit)
+}
+
+process_input :: proc(camera: ^Camera, player_unit: ^Unit, camera_mode: ^CameraMode) {
 
   // change camera mode
   if rl.IsKeyPressed(.Q) {
-    if camera_mode^ == CameraMode.First_Person {
-      camera_mode^ = CameraMode.Third_Person
-      camera.yaw = player_unit.yaw
-      camera.pitch = math.PI / 4 // 45 deg
-    } else {
-      camera_mode^ = CameraMode.First_Person
-      camera.yaw = player_unit.yaw
-      camera.pitch = player_unit.pitch
-    }
+    toggle_camera_mode(camera_mode, camera, player_unit)
+    return
   }
 
+  /******** ROTATION *************/
+  yaw, pitch: f32
 
-  walk_vector := calculate_walk_vector(camera.yaw)
-  right_vector := calculate_right_vector(camera.yaw)
+  // Rotate camera with mouse
+  rotate_mouse(&pitch, &yaw)
+  // Rotate camera with keyboard
+  rotate_with_keyboard(&pitch, &yaw)
 
-  move_vector: rl.Vector3
+  // do not allow pitch on 3rd person view
+  if camera_mode^ == CameraMode.Third_Person {
+    pitch = 0
+  }
 
-  // Move player and camera (W/S flipped because Z convention)
-  if rl.IsKeyDown(.W) do move_vector -= walk_vector
-  if rl.IsKeyDown(.S) do move_vector += walk_vector
-  if rl.IsKeyDown(.D) do move_vector += right_vector
-  if rl.IsKeyDown(.A) do move_vector -= right_vector
+  camera.pitch += pitch
+  camera.yaw += yaw
 
-  step := move(move_vector, SPEED)
-  player_unit.position += step
+  TOLERANCE :: 0.01
+  // prevent gimbal lock (-+90deg -+tolerance)
+  camera.pitch = rl.Clamp(camera.pitch, -math.PI / 2 + TOLERANCE, math.PI / 2 - TOLERANCE)
 
-  camera.position = get_camera_position_based_on_players(camera_mode, player_unit)
+  // Set player to the same rotation as camera
+  player_unit.pitch = camera.pitch
+  player_unit.yaw = camera.yaw
+
+  /******** TRANSLATION *************/
+  step_vector := move(camera.yaw, SPEED)
+  player_unit.position += step_vector
+  camera.position = get_camera_position_based_on_camera_mode(camera_mode, player_unit)
 }
 
 draw_gizmo :: proc() {
