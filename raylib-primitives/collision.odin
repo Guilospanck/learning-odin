@@ -237,13 +237,19 @@ main :: proc() {
 
   // Generate blocks
   blocks: [NUMBER_OF_BLOCKS]Block = {}
-  for i in 0 ..< NUMBER_OF_BLOCKS {
+  outer: for i in 0 ..< NUMBER_OF_BLOCKS {
     pos: rl.Vector3
 
-    // prevent placing blocks at the same places
+    // prevent placing blocks at the same places (limit to 3 attempts)
+    block_random_pos_attempts := 0
     for {
+      block_random_pos_attempts += 1
+
       pos = get_random_position()
-      if placed_block_pos[pos] do continue
+      if placed_block_pos[pos] {
+        if block_random_pos_attempts > 3 do continue outer
+        continue
+      }
 
       blocks[i] = Block {
         position = pos,
