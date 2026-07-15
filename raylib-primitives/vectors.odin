@@ -116,3 +116,81 @@ calculate_cross_product :: proc(v1, v2: rl.Vector3) -> rl.Vector3 {
   return rl.Vector3CrossProduct(v1, v2)
 }
 
+rotate :: proc(apply_tolerance: bool = false) -> (pitch, yaw: f32) {
+  delta := rl.GetMouseDelta()
+
+  yaw = -1 * delta.x * SENSITIVITY_MOUSE_RAD_S
+  pitch = delta.y * SENSITIVITY_MOUSE_RAD_S
+
+  if apply_tolerance {
+    TOLERANCE :: 0.01
+
+    // prevent gimbal lock (-+90deg -+tolerance)
+    pitch = rl.Clamp(pitch, -math.PI / 2 + TOLERANCE, math.PI / 2 - TOLERANCE)
+
+    // Clamps at [-pi, pi) just so the yaw doesn't grow undefinitely, but not a bug per-se
+    yaw = rl.Clamp(yaw, -1 * math.PI + TOLERANCE, math.PI - TOLERANCE)
+  }
+
+  return pitch, yaw
+}
+
+/*
+
+FUN FACT: 
+
+There's something called "diagonal strafing" or "strafe-running" in which
+running diagonally makes one run faster. This bug was shipped in many games,
+including Quake.
+
+If you think about it, pressing W and D at the same time (forward and right).
+
+forward is (0, 0, 1) and right is (1, 0, 0).
+This direction length of the resulting vector (forward + right) is:
+
+resulting vector : (0, 0, 1) + (1, 0, 0) = (1, 0, 1)
+length: sqrt(resulting^2) = sqrt(2) ~ 1.41
+
+which makes you run ~41% faster when diagonally.
+
+-> Therefore, we should always normalize the vector before moving the unit
+and before scaling by speed.
+
+if linalg.length(move) > 0 { // prevents division by zero
+    move = linalg.normalize(move)
+}
+cam.position += move * speed * dt
+
+
+CAVEAT
+
+what if you would press W and SPACE (go up) at the same time?
+
+SPACE moves you up in the y-axis (0, 1, 0).
+
+therefore the length of W + SPACE would be:
+
+sqrt([(0, 0, 1) + (0, 1, 0)]^2) 
+=> sqrt((0, 1, 1) ^2)
+=> sqrt(2)
+
+the same as W + D before, but here you could think about it:
+
+- do I want to normalize the up vector as well for that?
+- maybe you just want to normalize the ground direction (WASD), but
+leave the y-axis direction (SPACE, LEFT-SHIFT) as normal.
+
+*/
+
+
+move :: proc(position: rl.Vector3, speed: f32 = SPEED) -> rl.Vector3 {
+  position := position
+  if calculate_vector_magnitude(position) != 0 {   // prevents divide-by-zero
+    position = normalize_vector(position)
+  }
+
+  dt := rl.GetFrameTime()
+
+  return position * SPEED * dt
+}
+

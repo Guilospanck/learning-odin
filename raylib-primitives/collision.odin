@@ -12,7 +12,7 @@ HEIGHT :: 1080
 
 Unit :: struct {
   position:     rl.Vector3,
-  rotation:     rl.Vector3,
+  yaw, pitch:   f32,
   size:         rl.Vector3,
   velocity:     rl.Vector3,
   speed:        f32,
@@ -52,53 +52,71 @@ resolve_collision :: proc(unit: ^Unit, obstacle: rl.Vector3) {
   }
 }
 
+get_camera_position_based_on_players :: proc(
+  camera_mode: CameraMode,
+  player_unit: ^Unit,
+) -> rl.Vector3 {
+
+  if camera_mode == CameraMode.Third_Person {
+    return rl.Vector3 {
+      player_unit.position.x,
+      player_unit.position.y + 10.0,
+      player_unit.position.z + 10.0,
+    }
+  }
+
+  return player_unit.position
+}
+
 process_input :: proc(camera: ^Camera, player_unit: ^Unit, camera_mode: ^CameraMode) {
-  if rl.IsKeyDown(.LEFT_SHIFT) do rotate_camera(camera)
+
+  dt := rl.GetFrameTime()
+
+  // Rotate camera with mouse
+  pitch, yaw := rotate()
+
+  // Rotate camera with keyboard
+  if rl.IsKeyDown(.UP) do pitch -= SENSITIVITY_RAD_S * dt
+  if rl.IsKeyDown(.DOWN) do pitch += SENSITIVITY_RAD_S * dt
+  if rl.IsKeyDown(.LEFT) do yaw += SENSITIVITY_RAD_S * dt
+  if rl.IsKeyDown(.RIGHT) do yaw -= SENSITIVITY_RAD_S * dt
+
+  camera.pitch += pitch
+  camera.yaw += yaw
+  player_unit.pitch += pitch
+  player_unit.yaw += yaw
 
   // change camera mode
   if rl.IsKeyPressed(.Q) {
     if camera_mode^ == CameraMode.First_Person {
       camera_mode^ = CameraMode.Third_Person
-      camera.position = {
-        player_unit.position.x,
-        player_unit.position.y + 10.0,
-        player_unit.position.z + 10.0,
-      }
       camera.yaw = 0.0
-      camera.pitch = math.PI / 4
+      camera.pitch = math.PI / 4 // 45 deg
     } else {
       camera_mode^ = CameraMode.First_Person
-      camera.position = player_unit.position
-      camera.yaw = 0.0
-      camera.pitch = 0.0
+      camera.yaw = player_unit.yaw
+      camera.pitch = player_unit.pitch
     }
+
+    camera.position = get_camera_position_based_on_players(camera_mode^, player_unit)
   }
 
-  dt := rl.GetFrameTime()
 
-  // Rotate camera
-  if rl.IsKeyDown(.UP) do camera.pitch -= SENSITIVITY_RAD_S * dt
-  if rl.IsKeyDown(.DOWN) do camera.pitch += SENSITIVITY_RAD_S * dt
-  if rl.IsKeyDown(.LEFT) do camera.yaw += SENSITIVITY_RAD_S * dt
-  if rl.IsKeyDown(.RIGHT) do camera.yaw -= SENSITIVITY_RAD_S * dt
+  walk_vector := calculate_walk_vector(camera.yaw)
+  right_vector := calculate_right_vector(camera.yaw)
+
+  move_vector: rl.Vector3
 
   // Move player and camera
-  if rl.IsKeyDown(.W) {
-    player_unit.position.z -= player_unit.speed
-    camera.position.z -= player_unit.speed
-  }
-  if rl.IsKeyDown(.A) {
-    player_unit.position.x -= player_unit.speed
-    camera.position.x -= player_unit.speed
-  }
-  if rl.IsKeyDown(.S) {
-    player_unit.position.z += player_unit.speed
-    camera.position.z += player_unit.speed
-  }
-  if rl.IsKeyDown(.D) {
-    player_unit.position.x += player_unit.speed
-    camera.position.x += player_unit.speed
-  }
+  if rl.IsKeyDown(.W) do move_vector -= walk_vector
+  if rl.IsKeyDown(.S) do move_vector += walk_vector
+  if rl.IsKeyDown(.D) do move_vector += right_vector
+  if rl.IsKeyDown(.A) do move_vector -= right_vector
+
+  step := move(move_vector, SPEED)
+  camera.position += step
+  player_unit.position += step
+
 }
 
 draw_gizmo :: proc() {
