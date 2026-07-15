@@ -215,28 +215,16 @@ handle_collision :: proc(
   } else {
     player_unit^.colour = PLAYER_DEFAULT_COLOR
   }
-
-
 }
 
-main :: proc() {
-
-  rl.InitWindow(WIDTH, HEIGHT, "quadtree based collision detection")
-  defer rl.CloseWindow()
-
-  COLORS: []rl.Color = {rl.DARKPURPLE, rl.PURPLE, rl.DARKBLUE, rl.BLUE}
-
-  player_unit := Unit {
-    position = {-4.0, 1.0, -4.0},
-    colour   = PLAYER_DEFAULT_COLOR,
-  }
-  player_cell := get_cell_of_block(player_unit.position)
-
-  player_neighbouring_blocks: [dynamic]int = {}
+generate_blocks :: proc(
+  blocks: []Block,
+  player_neighbouring_blocks: ^[dynamic]int,
+  player_cell: rl.Vector3,
+) {
   placed_block_pos: map[rl.Vector3]bool = {}
 
-  // Generate blocks
-  blocks: [NUMBER_OF_BLOCKS]Block = {}
+
   outer: for i in 0 ..< NUMBER_OF_BLOCKS {
     pos: rl.Vector3
 
@@ -261,9 +249,33 @@ main :: proc() {
     }
 
     if (is_neighbouring_player(pos, player_cell)) {
-      append(&player_neighbouring_blocks, i)
+      append(player_neighbouring_blocks, i)
     }
   }
+}
+
+main :: proc() {
+
+  rl.InitWindow(WIDTH, HEIGHT, "quadtree based collision detection")
+  defer rl.CloseWindow()
+
+  COLORS: []rl.Color = {rl.DARKPURPLE, rl.PURPLE, rl.DARKBLUE, rl.BLUE}
+
+  player_unit := Unit {
+    position = {-4.0, 1.0, -4.0},
+    colour   = PLAYER_DEFAULT_COLOR,
+  }
+  player_cell := get_cell_of_block(player_unit.position)
+
+
+  // Generate blocks
+  player_neighbouring_blocks: [dynamic]int = {}
+  blocks: [NUMBER_OF_BLOCKS]Block = {}
+  generate_blocks(
+    blocks = blocks[:],
+    player_neighbouring_blocks = &player_neighbouring_blocks,
+    player_cell = player_cell,
+  )
 
   camera := Camera {
     position = {-4.0, 1.0, -4.0},
@@ -370,5 +382,7 @@ main :: proc() {
 
     free_all(context.temp_allocator)
   }
+
+  delete(player_neighbouring_blocks)
 }
 
