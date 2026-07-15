@@ -180,6 +180,8 @@ main :: proc() {
   }
 
   for !rl.WindowShouldClose() {
+    process_input(&camera, &player_unit, &camera_mode)
+
     collision = false
 
     // Check collisions player vs wall
@@ -196,18 +198,15 @@ main :: proc() {
       },
     }
 
-
     collision = rl.CheckCollisionBoxes(player_box, wall_box)
 
     if collision {
       player_unit.colour = rl.RED
       resolve_collision(&player_unit, wall.position)
+      camera.position = get_camera_position_based_on_camera_mode(&camera_mode, &player_unit)
     } else {
       player_unit.colour = PLAYER_DEFAULT_COLOR
     }
-
-    process_input(&camera, &player_unit, &camera_mode)
-
 
     view := view_matrix(camera)
 
