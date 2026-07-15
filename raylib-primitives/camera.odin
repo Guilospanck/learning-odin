@@ -36,7 +36,6 @@ SENSITIVITY_MOUSE_RAD_S: f32 : 0.003
 NEAR_PLANE: f32 : 0.1
 FAR_PLANE: f32 : 100.0
 
-CAMERA_DISTANCE_TO_PLAYER_3RD_PERSON_VIEW: f32 : 10.0
 
 calculate_forward_vector :: proc(pitch, yaw: f32) -> rl.Vector3 {
   assert(

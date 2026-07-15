@@ -58,6 +58,8 @@ get_camera_position_based_on_players :: proc(
 ) -> rl.Vector3 {
 
   if camera_mode^ == CameraMode.Third_Person {
+    CAMERA_DISTANCE_TO_PLAYER_3RD_PERSON_VIEW: f32 : 10.0
+
     forward_vector := calculate_forward_vector(player_unit.pitch, player_unit.yaw)
 
     return(
@@ -67,7 +69,9 @@ get_camera_position_based_on_players :: proc(
     )
   }
 
-  return player_unit.position
+  CAMERA_DISTANCE_TO_PLAYER_1ST_PERSON_VIEW: f32 : 1.0
+
+  return player_unit.position + {0, CAMERA_DISTANCE_TO_PLAYER_1ST_PERSON_VIEW, 0}
 }
 
 process_input :: proc(camera: ^Camera, player_unit: ^Unit, camera_mode: ^CameraMode) {
@@ -96,7 +100,7 @@ process_input :: proc(camera: ^Camera, player_unit: ^Unit, camera_mode: ^CameraM
   if rl.IsKeyPressed(.Q) {
     if camera_mode^ == CameraMode.First_Person {
       camera_mode^ = CameraMode.Third_Person
-      camera.yaw = 0.0
+      camera.yaw = player_unit.yaw
       camera.pitch = math.PI / 4 // 45 deg
     } else {
       camera_mode^ = CameraMode.First_Person
