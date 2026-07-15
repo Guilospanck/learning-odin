@@ -270,6 +270,8 @@ main :: proc() {
 
   // Generate blocks
   player_neighbouring_blocks: [dynamic]int = {}
+  defer delete(player_neighbouring_blocks)
+
   blocks: [NUMBER_OF_BLOCKS]Block = {}
   generate_blocks(
     blocks = blocks[:],
@@ -382,7 +384,5 @@ main :: proc() {
 
     free_all(context.temp_allocator)
   }
-
-  delete(player_neighbouring_blocks)
 }
 
