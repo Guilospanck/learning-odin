@@ -229,13 +229,14 @@ main :: proc() {
     rl.ClearBackground(rl.RAYWHITE)
 
     /***** 3D pass *****/
+    rlgl.EnableDepthTest()
 
     // set MVP matrix
     rlgl.SetMatrixProjection(projection)
     rlgl.SetMatrixModelview(view)
 
     // Draw wall
-    draw_cube(wall.position, wall.size, wall.colour)
+    draw_cube(pos = wall.position, size = wall.size, color = wall.colour, transparent = true)
 
     // Draw player
     draw_cube(player_unit.position, player_unit.size, player_unit.colour)
@@ -245,6 +246,7 @@ main :: proc() {
     // draw_sphere_on_ray_hit(camera, wall_box)
 
     rlgl.DrawRenderBatchActive() // flush 3D geometry with 3D matrices
+    rlgl.DisableDepthTest()
 
     /***** 2D pass *******/
 

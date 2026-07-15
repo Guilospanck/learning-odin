@@ -37,8 +37,11 @@ draw_cube :: proc(
   size: rl.Vector3,
   color: rl.Color = rl.GRAY,
   draw_wires: bool = true,
+  transparent: bool = false,
 ) {
-  rl.DrawCubeV(pos, size, color)
+  if !transparent {
+    rl.DrawCubeV(pos, size, color)
+  }
   if draw_wires {
     rl.DrawCubeWiresV(pos, size, rl.BLACK)
   }
