@@ -10,10 +10,12 @@ import rlgl "vendor:raylib/rlgl"
 TILE_SIZE :: 1.0
 GRID_SIZE :: 100
 
-NUMBER_OF_BLOCKS :: 100
+NUMBER_OF_BLOCKS :: 1000
 
 WIDTH :: 1920
 HEIGHT :: 1080
+
+PLAYER_DEFAULT_COLOR :: rl.GREEN
 
 Unit :: struct {
   position:   rl.Vector3,
@@ -42,6 +44,14 @@ resolve_collision :: proc(unit: ^Unit, obstacle: rl.Vector3) {
   if unit.position.x > obstacle.x + 1 {   // player on right
     unit.position.x += dt * SPEED
   }
+}
+
+get_cell_of_block :: proc(position: rl.Vector3) -> rl.Vector3 {
+  x := math.floor(position.x / TILE_SIZE)
+  y := math.floor(position.y / TILE_SIZE)
+  z := math.floor(position.z / TILE_SIZE)
+
+  return rl.Vector3{x, y, z}
 }
 
 get_camera_position_based_on_camera_mode :: proc(
@@ -139,17 +149,89 @@ get_random_position :: proc() -> rl.Vector3 {
   return rl.Vector3{f32(x) + 0.5, f32(y) + 0.5, f32(z) + 0.5}
 }
 
+is_neighbouring_player :: proc(block_position, player_cell: rl.Vector3) -> bool {
+
+  block_cell := get_cell_of_block(block_position)
+
+  dx := math.abs(block_cell.x - player_cell.x)
+  dy := math.abs(block_cell.y - player_cell.y)
+  dz := math.abs(block_cell.z - player_cell.z)
+
+  return dx <= 1 && dy <= 1 && dz <= 1
+}
+
+handle_collision :: proc(
+  player_unit: ^Unit,
+  camera: ^Camera,
+  camera_mode: ^CameraMode,
+  player_neighbouring_blocks: []int,
+  blocks: []Block,
+) {
+
+  collision := false
+  collided_block_pos: rl.Vector3 = rl.Vector3(0)
+
+  // Check collisions player vs block
+  player_box := rl.BoundingBox {
+    min = {
+      player_unit.position.x - TILE_SIZE / 2,
+      player_unit.position.y - TILE_SIZE / 2,
+      player_unit.position.z - TILE_SIZE / 2,
+    },
+    max = {
+      player_unit.position.x + TILE_SIZE / 2,
+      player_unit.position.y + TILE_SIZE / 2,
+      player_unit.position.z + TILE_SIZE / 2,
+    },
+  }
+
+  for b in player_neighbouring_blocks {
+    block := blocks[b]
+
+    block_box := rl.BoundingBox {
+      min = {
+        block.position.x - TILE_SIZE / 2,
+        block.position.y - TILE_SIZE / 2,
+        block.position.z - TILE_SIZE / 2,
+      },
+      max = {
+        block.position.x + TILE_SIZE / 2,
+        block.position.y + TILE_SIZE / 2,
+        block.position.z + TILE_SIZE / 2,
+      },
+    }
+
+    collision = rl.CheckCollisionBoxes(player_box, block_box)
+    if collision {
+      collided_block_pos = block.position
+      break
+    }
+  }
+
+  if collision {
+    player_unit.colour = rl.RED
+    resolve_collision(player_unit, collided_block_pos)
+    camera^.position = get_camera_position_based_on_camera_mode(camera_mode, player_unit)
+  } else {
+    player_unit^.colour = PLAYER_DEFAULT_COLOR
+  }
+
+
+}
+
 main :: proc() {
 
   rl.InitWindow(WIDTH, HEIGHT, "quadtree based collision detection")
   defer rl.CloseWindow()
 
-  PLAYER_DEFAULT_COLOR :: rl.GREEN
 
   player_unit := Unit {
     position = {-4.0, 1.0, -4.0},
     colour   = PLAYER_DEFAULT_COLOR,
   }
+  player_cell := get_cell_of_block(player_unit.position)
+
+  player_neighbouring_blocks: [dynamic]int = {}
 
   // Generate blocks
   blocks: [NUMBER_OF_BLOCKS]Block = {}
@@ -157,6 +239,10 @@ main :: proc() {
     pos := get_random_position()
     blocks[i] = Block {
       position = pos,
+    }
+
+    if (is_neighbouring_player(pos, player_cell)) {
+      append(&player_neighbouring_blocks, i)
     }
   }
 
@@ -175,51 +261,12 @@ main :: proc() {
   default_proj := rlgl.GetMatrixProjection()
   default_view := rlgl.GetMatrixModelview()
 
-  collision := false
-
   rl.SetTargetFPS(60)
-
-  // wall_box := rl.BoundingBox {
-  //   min = {
-  //     wall.position.x - wall.size.x / 2,
-  //     wall.position.y - wall.size.y / 2,
-  //     wall.position.z - wall.size.z / 2,
-  //   },
-  //   max = {
-  //     wall.position.x + wall.size.x / 2,
-  //     wall.position.y + wall.size.y / 2,
-  //     wall.position.z + wall.size.z / 2,
-  //   },
-  // }
 
   for !rl.WindowShouldClose() {
     process_input(&camera, &player_unit, &camera_mode)
 
-    // collision = false
-    //
-    // // Check collisions player vs wall
-    // player_box := rl.BoundingBox {
-    //   min = {
-    //     player_unit.position.x - player_unit.size.x / 2,
-    //     player_unit.position.y - player_unit.size.y / 2,
-    //     player_unit.position.z - player_unit.size.z / 2,
-    //   },
-    //   max = {
-    //     player_unit.position.x + player_unit.size.x / 2,
-    //     player_unit.position.y + player_unit.size.y / 2,
-    //     player_unit.position.z + player_unit.size.z / 2,
-    //   },
-    // }
-    //
-    // collision = rl.CheckCollisionBoxes(player_box, wall_box)
-    //
-    // if collision {
-    //   player_unit.colour = rl.RED
-    //   resolve_collision(&player_unit, wall.position)
-    //   camera.position = get_camera_position_based_on_camera_mode(&camera_mode, &player_unit)
-    // } else {
-    //   player_unit.colour = PLAYER_DEFAULT_COLOR
-    // }
+    handle_collision(&player_unit, &camera, &camera_mode, player_neighbouring_blocks[:], blocks[:])
 
     view := view_matrix(camera)
 
@@ -233,11 +280,15 @@ main :: proc() {
     rlgl.SetMatrixProjection(projection)
     rlgl.SetMatrixModelview(view)
 
-    // Draw wall
-    // draw_cube(pos = wall.position, size = wall.size, color = wall.colour, transparent = true)
+    // clear player_neighbouring_blocks dynamic array
+    clear(&player_neighbouring_blocks)
 
-    for b in blocks {
+    player_cell := get_cell_of_block(player_unit.position)
+    for b, i in blocks {
       draw_cube(pos = b.position, size = TILE_SIZE)
+      if (is_neighbouring_player(b.position, player_cell)) {
+        append(&player_neighbouring_blocks, i)
+      }
     }
 
     // Draw player
@@ -288,6 +339,14 @@ main :: proc() {
       player_unit.position.z,
     )
     draw_ui_text(text = player_pos_text, margin = 30, position = .Top_Left)
+
+    // draw neighbouring blocks quantity
+    neighbouring_blocks_quantity := rl.TextFormat(
+      "Neighbouring blocks: %d",
+      len(player_neighbouring_blocks),
+    )
+    draw_ui_text(text = neighbouring_blocks_quantity, margin = 30, position = .Bottom_Left)
+
     rl.EndDrawing()
 
     free_all(context.temp_allocator)
