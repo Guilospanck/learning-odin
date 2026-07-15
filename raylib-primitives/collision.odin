@@ -10,7 +10,7 @@ import rlgl "vendor:raylib/rlgl"
 TILE_SIZE :: 1.0
 GRID_SIZE :: 100
 
-NUMBER_OF_BLOCKS :: 1000
+NUMBER_OF_BLOCKS :: 1_000
 
 WIDTH :: 1920
 HEIGHT :: 1080
@@ -224,6 +224,7 @@ main :: proc() {
   rl.InitWindow(WIDTH, HEIGHT, "quadtree based collision detection")
   defer rl.CloseWindow()
 
+  COLORS: []rl.Color = {rl.GREEN, rl.RED, rl.YELLOW, rl.BLUE}
 
   player_unit := Unit {
     position = {-4.0, 1.0, -4.0},
@@ -232,6 +233,7 @@ main :: proc() {
   player_cell := get_cell_of_block(player_unit.position)
 
   player_neighbouring_blocks: [dynamic]int = {}
+  placed_block_pos: [dynamic]rl.Vector3 = {}
 
   // Generate blocks
   blocks: [NUMBER_OF_BLOCKS]Block = {}
@@ -285,7 +287,7 @@ main :: proc() {
 
     player_cell := get_cell_of_block(player_unit.position)
     for b, i in blocks {
-      draw_cube(pos = b.position, size = TILE_SIZE)
+      draw_cube(pos = b.position, size = TILE_SIZE, color = COLORS[i % len(COLORS)])
       if (is_neighbouring_player(b.position, player_cell)) {
         append(&player_neighbouring_blocks, i)
       }
