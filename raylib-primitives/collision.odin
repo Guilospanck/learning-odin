@@ -53,16 +53,18 @@ resolve_collision :: proc(unit: ^Unit, obstacle: rl.Vector3) {
 }
 
 get_camera_position_based_on_players :: proc(
-  camera_mode: CameraMode,
+  camera_mode: ^CameraMode,
   player_unit: ^Unit,
 ) -> rl.Vector3 {
 
-  if camera_mode == CameraMode.Third_Person {
-    return rl.Vector3 {
-      player_unit.position.x,
-      player_unit.position.y + 10.0,
-      player_unit.position.z + 10.0,
-    }
+  if camera_mode^ == CameraMode.Third_Person {
+    forward_vector := calculate_forward_vector(player_unit.pitch, player_unit.yaw)
+
+    return(
+      player_unit.position +
+      forward_vector * CAMERA_DISTANCE_TO_PLAYER_3RD_PERSON_VIEW +
+      {0, CAMERA_DISTANCE_TO_PLAYER_3RD_PERSON_VIEW, 0} \
+    )
   }
 
   return player_unit.position
@@ -81,9 +83,13 @@ process_input :: proc(camera: ^Camera, player_unit: ^Unit, camera_mode: ^CameraM
   if rl.IsKeyDown(.LEFT) do yaw += SENSITIVITY_RAD_S * dt
   if rl.IsKeyDown(.RIGHT) do yaw -= SENSITIVITY_RAD_S * dt
 
-  camera.pitch += pitch
+  // do not allow pitch on 3rd person view
+  if camera_mode^ != CameraMode.Third_Person {
+    camera.pitch += pitch
+    player_unit.pitch += pitch
+  }
+
   camera.yaw += yaw
-  player_unit.pitch += pitch
   player_unit.yaw += yaw
 
   // change camera mode
@@ -97,8 +103,6 @@ process_input :: proc(camera: ^Camera, player_unit: ^Unit, camera_mode: ^CameraM
       camera.yaw = player_unit.yaw
       camera.pitch = player_unit.pitch
     }
-
-    camera.position = get_camera_position_based_on_players(camera_mode^, player_unit)
   }
 
 
@@ -107,16 +111,16 @@ process_input :: proc(camera: ^Camera, player_unit: ^Unit, camera_mode: ^CameraM
 
   move_vector: rl.Vector3
 
-  // Move player and camera
+  // Move player and camera (W/S flipped because Z convention)
   if rl.IsKeyDown(.W) do move_vector -= walk_vector
   if rl.IsKeyDown(.S) do move_vector += walk_vector
   if rl.IsKeyDown(.D) do move_vector += right_vector
   if rl.IsKeyDown(.A) do move_vector -= right_vector
 
   step := move(move_vector, SPEED)
-  camera.position += step
   player_unit.position += step
 
+  camera.position = get_camera_position_based_on_players(camera_mode, player_unit)
 }
 
 draw_gizmo :: proc() {
