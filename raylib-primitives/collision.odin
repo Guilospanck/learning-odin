@@ -2,25 +2,27 @@ package raylib_primitives
 
 import "core:fmt"
 import "core:math"
+import "core:math/rand"
 import "core:strings"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 
 TILE_SIZE :: 1.0
+GRID_SIZE :: 100
+
+NUMBER_OF_BLOCKS :: 100
+
 WIDTH :: 1920
 HEIGHT :: 1080
 
 Unit :: struct {
   position:   rl.Vector3,
   yaw, pitch: f32,
-  size:       rl.Vector3,
   colour:     rl.Color,
 }
 
-Wall :: struct {
+Block :: struct {
   position: rl.Vector3,
-  size:     rl.Vector3,
-  colour:   rl.Color,
 }
 
 // Basically just cancels unit movement
@@ -60,7 +62,7 @@ get_camera_position_based_on_camera_mode :: proc(
     )
   }
 
-  CAMERA_DISTANCE_TO_PLAYER_1ST_PERSON_VIEW: f32 : 1.0
+  CAMERA_DISTANCE_TO_PLAYER_1ST_PERSON_VIEW: f32 : 0.5
 
   return player_unit.position + {0, CAMERA_DISTANCE_TO_PLAYER_1ST_PERSON_VIEW, 0}
 }
@@ -128,6 +130,15 @@ draw_sphere_on_ray_hit :: proc(camera: rl.Camera3D, box_collision: rl.BoundingBo
   }
 }
 
+get_random_position :: proc() -> rl.Vector3 {
+  x := rand.int32_range(-GRID_SIZE / 2, GRID_SIZE / 2)
+  y := rand.int32_range(0, 10)
+  z := rand.int32_range(-GRID_SIZE / 2, GRID_SIZE / 2)
+
+  // add 0.5 so cube sits in the cell, not spanning 2 halves of 2 of them
+  return rl.Vector3{f32(x) + 0.5, f32(y) + 0.5, f32(z) + 0.5}
+}
+
 main :: proc() {
 
   rl.InitWindow(WIDTH, HEIGHT, "quadtree based collision detection")
@@ -137,14 +148,16 @@ main :: proc() {
 
   player_unit := Unit {
     position = {-4.0, 1.0, -4.0},
-    size     = {1.0, 2.0, 1.0},
     colour   = PLAYER_DEFAULT_COLOR,
   }
 
-  wall := Wall {
-    position = {0.0, 1.0, 0.0},
-    size     = rl.Vector3(2.0),
-    colour   = rl.YELLOW,
+  // Generate blocks
+  blocks: [NUMBER_OF_BLOCKS]Block = {}
+  for i in 0 ..< NUMBER_OF_BLOCKS {
+    pos := get_random_position()
+    blocks[i] = Block {
+      position = pos,
+    }
   }
 
   camera := Camera {
@@ -166,47 +179,47 @@ main :: proc() {
 
   rl.SetTargetFPS(60)
 
-  wall_box := rl.BoundingBox {
-    min = {
-      wall.position.x - wall.size.x / 2,
-      wall.position.y - wall.size.y / 2,
-      wall.position.z - wall.size.z / 2,
-    },
-    max = {
-      wall.position.x + wall.size.x / 2,
-      wall.position.y + wall.size.y / 2,
-      wall.position.z + wall.size.z / 2,
-    },
-  }
+  // wall_box := rl.BoundingBox {
+  //   min = {
+  //     wall.position.x - wall.size.x / 2,
+  //     wall.position.y - wall.size.y / 2,
+  //     wall.position.z - wall.size.z / 2,
+  //   },
+  //   max = {
+  //     wall.position.x + wall.size.x / 2,
+  //     wall.position.y + wall.size.y / 2,
+  //     wall.position.z + wall.size.z / 2,
+  //   },
+  // }
 
   for !rl.WindowShouldClose() {
     process_input(&camera, &player_unit, &camera_mode)
 
-    collision = false
-
-    // Check collisions player vs wall
-    player_box := rl.BoundingBox {
-      min = {
-        player_unit.position.x - player_unit.size.x / 2,
-        player_unit.position.y - player_unit.size.y / 2,
-        player_unit.position.z - player_unit.size.z / 2,
-      },
-      max = {
-        player_unit.position.x + player_unit.size.x / 2,
-        player_unit.position.y + player_unit.size.y / 2,
-        player_unit.position.z + player_unit.size.z / 2,
-      },
-    }
-
-    collision = rl.CheckCollisionBoxes(player_box, wall_box)
-
-    if collision {
-      player_unit.colour = rl.RED
-      resolve_collision(&player_unit, wall.position)
-      camera.position = get_camera_position_based_on_camera_mode(&camera_mode, &player_unit)
-    } else {
-      player_unit.colour = PLAYER_DEFAULT_COLOR
-    }
+    // collision = false
+    //
+    // // Check collisions player vs wall
+    // player_box := rl.BoundingBox {
+    //   min = {
+    //     player_unit.position.x - player_unit.size.x / 2,
+    //     player_unit.position.y - player_unit.size.y / 2,
+    //     player_unit.position.z - player_unit.size.z / 2,
+    //   },
+    //   max = {
+    //     player_unit.position.x + player_unit.size.x / 2,
+    //     player_unit.position.y + player_unit.size.y / 2,
+    //     player_unit.position.z + player_unit.size.z / 2,
+    //   },
+    // }
+    //
+    // collision = rl.CheckCollisionBoxes(player_box, wall_box)
+    //
+    // if collision {
+    //   player_unit.colour = rl.RED
+    //   resolve_collision(&player_unit, wall.position)
+    //   camera.position = get_camera_position_based_on_camera_mode(&camera_mode, &player_unit)
+    // } else {
+    //   player_unit.colour = PLAYER_DEFAULT_COLOR
+    // }
 
     view := view_matrix(camera)
 
@@ -221,16 +234,25 @@ main :: proc() {
     rlgl.SetMatrixModelview(view)
 
     // Draw wall
-    draw_cube(pos = wall.position, size = wall.size, color = wall.colour, transparent = true)
+    // draw_cube(pos = wall.position, size = wall.size, color = wall.colour, transparent = true)
+
+    for b in blocks {
+      draw_cube(pos = b.position, size = TILE_SIZE)
+    }
 
     // Draw player
-    draw_cube(player_unit.position, player_unit.size, player_unit.colour)
+    draw_cube(
+      pos = player_unit.position,
+      size = TILE_SIZE,
+      color = player_unit.colour,
+      draw_wires = false,
+    )
 
     // Draw gizmo
     draw_gizmo()
 
     // Draw grid
-    rl.DrawGrid(100, TILE_SIZE)
+    rl.DrawGrid(GRID_SIZE, TILE_SIZE)
 
     // TODO: need to find a way now with the custom camera
     // draw_sphere_on_ray_hit(camera, wall_box)
