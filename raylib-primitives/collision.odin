@@ -12,6 +12,8 @@ TILE_SIZE :: 1.0
 GRID_SIZE :: 100
 
 NUMBER_OF_BLOCKS :: 10_000
+BLOCK_SIZE :: 1.0
+BLOCK_COLORS: []rl.Color = {rl.DARKPURPLE, rl.PURPLE, rl.DARKBLUE, rl.BLUE}
 
 WIDTH :: 1920
 HEIGHT :: 1080
@@ -27,8 +29,9 @@ Unit :: struct {
   colour:     rl.Color,
 }
 
-Block :: struct {
-  position: rl.Vector3,
+Blocks :: struct {
+  positions: [NUMBER_OF_BLOCKS]rl.Vector3,
+  colors:    [NUMBER_OF_BLOCKS]rl.Color,
 }
 
 // Basically just cancels unit movement
@@ -171,7 +174,7 @@ handle_collision :: proc(
   camera: ^Camera,
   camera_mode: ^CameraMode,
   player_neighbouring_blocks: []int,
-  blocks: []Block,
+  blocks_positions: []rl.Vector3,
 ) {
   spall.SCOPED_EVENT(&spall_ctx, &spall_buffer, "handle_collision")
 
@@ -193,24 +196,24 @@ handle_collision :: proc(
   }
 
   for b in player_neighbouring_blocks {
-    block := blocks[b]
+    block_pos := blocks_positions[b]
 
     block_box := rl.BoundingBox {
       min = {
-        block.position.x - TILE_SIZE / 2,
-        block.position.y - TILE_SIZE / 2,
-        block.position.z - TILE_SIZE / 2,
+        block_pos.x - TILE_SIZE / 2,
+        block_pos.y - TILE_SIZE / 2,
+        block_pos.z - TILE_SIZE / 2,
       },
       max = {
-        block.position.x + TILE_SIZE / 2,
-        block.position.y + TILE_SIZE / 2,
-        block.position.z + TILE_SIZE / 2,
+        block_pos.x + TILE_SIZE / 2,
+        block_pos.y + TILE_SIZE / 2,
+        block_pos.z + TILE_SIZE / 2,
       },
     }
 
     collision = rl.CheckCollisionBoxes(player_box, block_box)
     if collision {
-      collided_block_pos = block.position
+      collided_block_pos = block_pos
       break
     }
   }
@@ -225,7 +228,8 @@ handle_collision :: proc(
 }
 
 generate_blocks :: proc(
-  blocks: []Block,
+  blocks: ^Blocks,
+  block_transforms: []rl.Matrix,
   player_neighbouring_blocks: ^[dynamic]int,
   player_cell: rl.Vector3,
 ) {
@@ -247,9 +251,12 @@ generate_blocks :: proc(
         continue
       }
 
-      blocks[i] = Block {
-        position = pos,
-      }
+      color := BLOCK_COLORS[i % len(BLOCK_COLORS)]
+
+      blocks.positions[i] = pos
+      blocks.colors[i] = color
+
+      block_transforms[i] = rl.MatrixTranslate(pos.x, pos.y, pos.z)
 
       placed_block_pos[pos] = true
 
@@ -275,7 +282,6 @@ main :: proc() {
   rl.InitWindow(WIDTH, HEIGHT, "quadtree based collision detection")
   defer rl.CloseWindow()
 
-  COLORS: []rl.Color = {rl.DARKPURPLE, rl.PURPLE, rl.DARKBLUE, rl.BLUE}
 
   player_unit := Unit {
     position = {-4.0, 1.0, -4.0},
@@ -288,12 +294,59 @@ main :: proc() {
   player_neighbouring_blocks: [dynamic]int = {}
   defer delete(player_neighbouring_blocks)
 
-  blocks: [NUMBER_OF_BLOCKS]Block = {}
+  blocks: Blocks = {
+    positions = {},
+    colors    = {},
+  }
+  block_transforms: [NUMBER_OF_BLOCKS]rl.Matrix = {}
   generate_blocks(
-    blocks = blocks[:],
+    blocks = &blocks,
+    block_transforms = block_transforms[:],
     player_neighbouring_blocks = &player_neighbouring_blocks,
     player_cell = player_cell,
   )
+
+  // Set blocks mesh
+  blocks_mesh := rl.GenMeshCube(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE)
+  // Shaders
+  // NOTE: uniform: for all vertices; attribute: for specific vertex/instance
+  shader := rl.LoadShader("./shaders/block.vs", "./shaders/block.fs")
+  shader.locs[rl.ShaderLocationIndex.MATRIX_MVP] = rl.GetShaderLocation(shader, "mvp")
+  shader.locs[rl.ShaderLocationIndex.MATRIX_MODEL] = rl.GetShaderLocationAttrib(
+    shader,
+    "instanceTransform", // same name as in the .vs file. rl.DrawMeshInstanced() will pass it as 3rd argument
+  )
+
+  // add color per block
+  instance_color := rl.GetShaderLocationAttrib(shader, "instanceColor")
+
+  // VAO (Vertex Array Object) is the config that tells what the VBO (Vertex Buffer Object) data is about
+  rlgl.EnableVertexArray(blocks_mesh.vaoId)
+  vbo := rlgl.LoadVertexBuffer(
+    buffer = &blocks.colors[0],
+    size = len(blocks.colors) * size_of(rl.Color),
+    is_dynamic = false,
+  )
+  rlgl.EnableVertexAttribute(u32(instance_color))
+  rlgl.SetVertexAttribute(
+    index = u32(instance_color),
+    compSize = size_of(rl.Color),
+    type = rlgl.UNSIGNED_BYTE,
+    normalized = true, // true = GPU divides by 255 for us (GPU expects to receive 0..1, not 0..255)
+    stride = 0,
+    offset = 0,
+  )
+  // divisor = 0 -> different attribute for each vertice;
+  // divisor = 1 -> different attribute for each instance
+  // divisor = 2-> different attribute every 2 instances;
+  // divisor = 3..x -> different attribute every x instances;
+  rlgl.SetVertexAttributeDivisor(index = u32(instance_color), divisor = 1)
+  rlgl.DisableVertexArray()
+
+  // Materials
+  block_material := rl.LoadMaterialDefault()
+  block_material.shader = shader
+
 
   camera := Camera {
     position = {-4.0, 1.0, -4.0},
@@ -317,7 +370,13 @@ main :: proc() {
 
     process_input(&camera, &player_unit, &camera_mode)
 
-    handle_collision(&player_unit, &camera, &camera_mode, player_neighbouring_blocks[:], blocks[:])
+    handle_collision(
+      player_unit = &player_unit,
+      camera = &camera,
+      camera_mode = &camera_mode,
+      player_neighbouring_blocks = player_neighbouring_blocks[:],
+      blocks_positions = blocks.positions[:],
+    )
 
     view := view_matrix(camera)
 
@@ -338,19 +397,31 @@ main :: proc() {
 
     {
       spall.SCOPED_EVENT(&spall_ctx, &spall_buffer, "draw_blocks")
-      for b, i in blocks {
-        draw_cube(pos = b.position, size = TILE_SIZE, color = COLORS[i % len(COLORS)])
-      }
+      // raylib uplaods block_transforms to the locs[MATRIX_MODEL]
+      rl.DrawMeshInstanced(
+        blocks_mesh,
+        block_material,
+        &block_transforms[0],
+        len(blocks.positions),
+      )
     }
 
     {
       spall.SCOPED_EVENT(&spall_ctx, &spall_buffer, "neighbour_check")
-      for b, i in blocks {
-        if is_neighbouring_player(b.position, player_cell) {
+      for b_pos, i in blocks.positions {
+        if is_neighbouring_player(b_pos, player_cell) {
           append(&player_neighbouring_blocks, i)
         }
       }
     }
+
+    // Draw player
+    draw_cube(
+      pos = player_unit.position,
+      size = TILE_SIZE,
+      color = player_unit.colour,
+      draw_wires = false,
+    )
 
     // Draw gizmo
     draw_gizmo()
