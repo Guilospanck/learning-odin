@@ -3,6 +3,7 @@ package raylib_primitives
 import "core:fmt"
 import "core:math"
 import "core:math/rand"
+import "core:prof/spall"
 import "core:strings"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
@@ -17,6 +18,9 @@ HEIGHT :: 1080
 
 PLAYER_DEFAULT_COLOR :: rl.GREEN
 
+spall_ctx: spall.Context
+spall_buffer: spall.Buffer
+
 Unit :: struct {
   position:   rl.Vector3,
   yaw, pitch: f32,
@@ -29,6 +33,7 @@ Block :: struct {
 
 // Basically just cancels unit movement
 resolve_collision :: proc(unit: ^Unit, obstacle: rl.Vector3) {
+  spall.SCOPED_EVENT(&spall_ctx, &spall_buffer, "resolve_collision")
   dt := rl.GetFrameTime()
 
   // Collision resolution logic
@@ -95,6 +100,7 @@ toggle_camera_mode :: proc(camera_mode: ^CameraMode, camera: ^Camera, player_uni
 }
 
 process_input :: proc(camera: ^Camera, player_unit: ^Unit, camera_mode: ^CameraMode) {
+  spall.SCOPED_EVENT(&spall_ctx, &spall_buffer, "process_input")
 
   // change camera mode
   if rl.IsKeyPressed(.Q) {
@@ -167,6 +173,7 @@ handle_collision :: proc(
   player_neighbouring_blocks: []int,
   blocks: []Block,
 ) {
+  spall.SCOPED_EVENT(&spall_ctx, &spall_buffer, "handle_collision")
 
   collision := false
   collided_block_pos: rl.Vector3 = rl.Vector3(0)
@@ -222,6 +229,7 @@ generate_blocks :: proc(
   player_neighbouring_blocks: ^[dynamic]int,
   player_cell: rl.Vector3,
 ) {
+  spall.SCOPED_EVENT(&spall_ctx, &spall_buffer, "generate_blocks")
   placed_block_pos: map[rl.Vector3]bool = {}
 
 
@@ -255,6 +263,14 @@ generate_blocks :: proc(
 }
 
 main :: proc() {
+  spall_ctx = spall.context_create("trace.spall")
+  defer spall.context_destroy(&spall_ctx)
+
+  buffer_backing := make([]u8, 1 << 20) // 1MB
+  spall_buffer = spall.buffer_create(buffer_backing)
+  defer spall.buffer_destroy(&spall_ctx, &spall_buffer)
+
+  spall.SCOPED_EVENT(&spall_ctx, &spall_buffer, "main")
 
   rl.InitWindow(WIDTH, HEIGHT, "quadtree based collision detection")
   defer rl.CloseWindow()
@@ -297,6 +313,8 @@ main :: proc() {
   rl.SetTargetFPS(60)
 
   for !rl.WindowShouldClose() {
+    spall.SCOPED_EVENT(&spall_ctx, &spall_buffer, "frame")
+
     process_input(&camera, &player_unit, &camera_mode)
 
     handle_collision(&player_unit, &camera, &camera_mode, player_neighbouring_blocks[:], blocks[:])
@@ -317,20 +335,22 @@ main :: proc() {
     clear(&player_neighbouring_blocks)
 
     player_cell := get_cell_of_block(player_unit.position)
-    for b, i in blocks {
-      draw_cube(pos = b.position, size = TILE_SIZE, color = COLORS[i % len(COLORS)])
-      if (is_neighbouring_player(b.position, player_cell)) {
-        append(&player_neighbouring_blocks, i)
+
+    {
+      spall.SCOPED_EVENT(&spall_ctx, &spall_buffer, "draw_blocks")
+      for b, i in blocks {
+        draw_cube(pos = b.position, size = TILE_SIZE, color = COLORS[i % len(COLORS)])
       }
     }
 
-    // Draw player
-    draw_cube(
-      pos = player_unit.position,
-      size = TILE_SIZE,
-      color = player_unit.colour,
-      draw_wires = false,
-    )
+    {
+      spall.SCOPED_EVENT(&spall_ctx, &spall_buffer, "neighbour_check")
+      for b, i in blocks {
+        if is_neighbouring_player(b.position, player_cell) {
+          append(&player_neighbouring_blocks, i)
+        }
+      }
+    }
 
     // Draw gizmo
     draw_gizmo()
