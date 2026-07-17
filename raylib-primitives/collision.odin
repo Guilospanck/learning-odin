@@ -123,14 +123,6 @@ process_input :: proc(camera: ^Camera, player_unit: ^Unit, camera_mode: ^CameraM
   camera.position = get_camera_position_based_on_camera_mode(camera_mode, player_unit)
 }
 
-draw_sphere_on_ray_hit :: proc(camera: rl.Camera3D, box_collision: rl.BoundingBox) {
-  ray := rl.GetScreenToWorldRay(rl.GetMousePosition(), camera)
-  ray_collision := rl.GetRayCollisionBox(ray, box_collision)
-  if ray_collision.hit {
-    rl.DrawSphere(ray_collision.point, 0.3, rl.RED)
-  }
-}
-
 is_neighbouring_player :: proc(block_position, player_cell: rl.Vector3) -> bool {
   block_cell := get_cell_of_block(block_position)
 
@@ -207,6 +199,11 @@ HUD :: struct {
 }
 
 draw_HUD :: proc(hud: HUD) {
+  // flush 3D geometry with 3D matrices
+  rlgl.DrawRenderBatchActive()
+  // disable depth test so our text doesn't get it
+  rlgl.DisableDepthTest()
+
   // Restore 2D matrices for drawing 2D
   rlgl.SetMatrixProjection(hud.default_proj)
   rlgl.SetMatrixModelview(hud.default_view)
@@ -403,12 +400,6 @@ main :: proc() {
 
     // Draw grid
     rl.DrawGrid(GRID_SIZE, TILE_SIZE)
-
-    // TODO: need to find a way now with the custom camera
-    // draw_sphere_on_ray_hit(camera, wall_box)
-
-    rlgl.DrawRenderBatchActive() // flush 3D geometry with 3D matrices
-    rlgl.DisableDepthTest()
 
     /***** 2D pass *******/
     draw_HUD(
