@@ -199,6 +199,50 @@ handle_collision :: proc(
   }
 }
 
+HUD :: struct {
+  default_proj, default_view: rl.Matrix,
+  yaw, pitch:                 f32,
+  player_position:            rl.Vector3,
+  neighbouring_blocks_len:    int,
+}
+
+draw_HUD :: proc(hud: HUD) {
+  // Restore 2D matrices for drawing 2D
+  rlgl.SetMatrixProjection(hud.default_proj)
+  rlgl.SetMatrixModelview(hud.default_view)
+
+  rl.DrawFPS(10, 10)
+
+  // draw camera angles
+  // NOTE: uses a buffer so we prevent flickering
+  buf: [256]byte
+  s := fmt.bprintf(
+    buf[:],
+    "Camera angles:\n\nyaw = %.1fdeg\n\npitch = %.1fdeg",
+    math.to_degrees_f32(hud.yaw),
+    math.to_degrees_f32(hud.pitch),
+  )
+  camera_angles_text := strings.clone_to_cstring(s, context.temp_allocator)
+  draw_ui_text(text = camera_angles_text, margin = 60, position = .Top_Right)
+
+  // Draw position text
+  player_pos_text := rl.TextFormat(
+    "player pos:\n\nX = %f\n\nY = %f\n\nZ = %f",
+    hud.player_position.x,
+    hud.player_position.y,
+    hud.player_position.z,
+  )
+  draw_ui_text(text = player_pos_text, margin = 30, position = .Top_Left)
+
+  // draw neighbouring blocks quantity
+  neighbouring_blocks_quantity := rl.TextFormat(
+    "Neighbouring blocks: %d",
+    hud.neighbouring_blocks_len,
+  )
+  draw_ui_text(text = neighbouring_blocks_quantity, margin = 30, position = .Bottom_Left)
+
+}
+
 main :: proc() {
   spall_ctx = spall.context_create("trace.spall")
   defer spall.context_destroy(&spall_ctx)
@@ -229,7 +273,7 @@ main :: proc() {
     colors    = {},
   }
   block_transforms: [NUMBER_OF_BLOCKS]rl.Matrix = {}
-  generate_chunk(
+  generate_chunk_and_fill_in_neighbouring_blocks(
     chunk = &blocks,
     block_transforms = block_transforms[:],
     player_neighbouring_blocks = &player_neighbouring_blocks,
@@ -367,40 +411,16 @@ main :: proc() {
     rlgl.DisableDepthTest()
 
     /***** 2D pass *******/
-
-    // Restore 2D matrices for drawing 2D
-    rlgl.SetMatrixProjection(default_proj)
-    rlgl.SetMatrixModelview(default_view)
-
-    rl.DrawFPS(10, 10)
-
-    // draw camera angles
-    // NOTE: uses a buffer so we prevent flickering
-    buf: [256]byte
-    s := fmt.bprintf(
-      buf[:],
-      "Camera angles:\n\nyaw = %.1fdeg\n\npitch = %.1fdeg",
-      math.to_degrees_f32(camera.yaw),
-      math.to_degrees_f32(camera.pitch),
+    draw_HUD(
+      {
+        neighbouring_blocks_len = len(player_neighbouring_blocks),
+        yaw = camera.yaw,
+        pitch = camera.pitch,
+        player_position = player_unit.position,
+        default_proj = default_proj,
+        default_view = default_view,
+      },
     )
-    camera_angles_text := strings.clone_to_cstring(s, context.temp_allocator)
-    draw_ui_text(text = camera_angles_text, margin = 60, position = .Top_Right)
-
-    // Draw position text
-    player_pos_text := rl.TextFormat(
-      "player pos:\n\nX = %f\n\nY = %f\n\nZ = %f",
-      player_unit.position.x,
-      player_unit.position.y,
-      player_unit.position.z,
-    )
-    draw_ui_text(text = player_pos_text, margin = 30, position = .Top_Left)
-
-    // draw neighbouring blocks quantity
-    neighbouring_blocks_quantity := rl.TextFormat(
-      "Neighbouring blocks: %d",
-      len(player_neighbouring_blocks),
-    )
-    draw_ui_text(text = neighbouring_blocks_quantity, margin = 30, position = .Bottom_Left)
 
     rl.EndDrawing()
 

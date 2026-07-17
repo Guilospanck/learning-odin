@@ -38,7 +38,5 @@ draw_ui_text :: proc(
     x = screen_width / 2 - text_width; y = screen_height / 2 - font_size
   }
   rl.DrawText(text, x, y, font_size, color)
-
-
 }
 

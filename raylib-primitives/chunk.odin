@@ -7,7 +7,10 @@ NUMBER_OF_BLOCKS :: 10_000
 BLOCK_SIZE :: 1.0
 BLOCK_COLORS: []rl.Color = {rl.DARKPURPLE, rl.PURPLE, rl.DARKBLUE, rl.BLUE}
 
+MAX_RAND_NUMBER_ATTEMPTS :: 3
+
 Block_Kind :: enum {
+  Air,
   Sand,
   Stone,
   Water,
@@ -18,7 +21,7 @@ Chunk :: struct {
   colors:    [NUMBER_OF_BLOCKS]rl.Color,
 }
 
-generate_chunk :: proc(
+generate_chunk_and_fill_in_neighbouring_blocks :: proc(
   chunk: ^Chunk,
   block_transforms: []rl.Matrix,
   player_neighbouring_blocks: ^[dynamic]int,
@@ -31,14 +34,14 @@ generate_chunk :: proc(
   outer: for i in 0 ..< NUMBER_OF_BLOCKS {
     pos: rl.Vector3
 
-    // prevent placing blocks at the same places (limit to 3 attempts)
+    // prevent placing blocks at the same places (limit to MAX_RAND_NUMBER_ATTEMPTS)
     block_random_pos_attempts := 0
     for {
       block_random_pos_attempts += 1
 
       pos = get_random_position()
       if placed_block_pos[pos] {
-        if block_random_pos_attempts > 3 do continue outer
+        if block_random_pos_attempts > MAX_RAND_NUMBER_ATTEMPTS do continue outer
         continue
       }
 
@@ -54,6 +57,7 @@ generate_chunk :: proc(
       break
     }
 
+    // Fill in the neighbouring player dynamic array
     if (is_neighbouring_player(pos, player_cell)) {
       append(player_neighbouring_blocks, i)
     }
