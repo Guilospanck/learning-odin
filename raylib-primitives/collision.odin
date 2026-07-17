@@ -2,7 +2,6 @@ package raylib_primitives
 
 import "core:fmt"
 import "core:math"
-import "core:math/rand"
 import "core:prof/spall"
 import "core:strings"
 import rl "vendor:raylib"
@@ -10,10 +9,6 @@ import rlgl "vendor:raylib/rlgl"
 
 TILE_SIZE :: 1.0
 GRID_SIZE :: 100
-
-NUMBER_OF_BLOCKS :: 10_000
-BLOCK_SIZE :: 1.0
-BLOCK_COLORS: []rl.Color = {rl.DARKPURPLE, rl.PURPLE, rl.DARKBLUE, rl.BLUE}
 
 WIDTH :: 1920
 HEIGHT :: 1080
@@ -27,11 +22,6 @@ Unit :: struct {
   position:   rl.Vector3,
   yaw, pitch: f32,
   colour:     rl.Color,
-}
-
-Blocks :: struct {
-  positions: [NUMBER_OF_BLOCKS]rl.Vector3,
-  colors:    [NUMBER_OF_BLOCKS]rl.Color,
 }
 
 // Basically just cancels unit movement
@@ -52,14 +42,6 @@ resolve_collision :: proc(unit: ^Unit, obstacle: rl.Vector3) {
   if unit.position.x > obstacle.x + 1 {   // player on right
     unit.position.x += dt * SPEED
   }
-}
-
-get_cell_of_block :: proc(position: rl.Vector3) -> rl.Vector3 {
-  x := math.floor(position.x / TILE_SIZE)
-  y := math.floor(position.y / TILE_SIZE)
-  z := math.floor(position.z / TILE_SIZE)
-
-  return rl.Vector3{x, y, z}
 }
 
 get_camera_position_based_on_camera_mode :: proc(
@@ -149,17 +131,7 @@ draw_sphere_on_ray_hit :: proc(camera: rl.Camera3D, box_collision: rl.BoundingBo
   }
 }
 
-get_random_position :: proc() -> rl.Vector3 {
-  x := rand.int32_range(-GRID_SIZE / 2, GRID_SIZE / 2)
-  y := rand.int32_range(0, 10)
-  z := rand.int32_range(-GRID_SIZE / 2, GRID_SIZE / 2)
-
-  // add 0.5 so cube sits in the cell, not spanning 2 halves of 2 of them
-  return rl.Vector3{f32(x) + 0.5, f32(y) + 0.5, f32(z) + 0.5}
-}
-
 is_neighbouring_player :: proc(block_position, player_cell: rl.Vector3) -> bool {
-
   block_cell := get_cell_of_block(block_position)
 
   dx := math.abs(block_cell.x - player_cell.x)
@@ -227,48 +199,6 @@ handle_collision :: proc(
   }
 }
 
-generate_blocks :: proc(
-  blocks: ^Blocks,
-  block_transforms: []rl.Matrix,
-  player_neighbouring_blocks: ^[dynamic]int,
-  player_cell: rl.Vector3,
-) {
-  spall.SCOPED_EVENT(&spall_ctx, &spall_buffer, "generate_blocks")
-  placed_block_pos: map[rl.Vector3]bool = {}
-
-
-  outer: for i in 0 ..< NUMBER_OF_BLOCKS {
-    pos: rl.Vector3
-
-    // prevent placing blocks at the same places (limit to 3 attempts)
-    block_random_pos_attempts := 0
-    for {
-      block_random_pos_attempts += 1
-
-      pos = get_random_position()
-      if placed_block_pos[pos] {
-        if block_random_pos_attempts > 3 do continue outer
-        continue
-      }
-
-      color := BLOCK_COLORS[i % len(BLOCK_COLORS)]
-
-      blocks.positions[i] = pos
-      blocks.colors[i] = color
-
-      block_transforms[i] = rl.MatrixTranslate(pos.x, pos.y, pos.z)
-
-      placed_block_pos[pos] = true
-
-      break
-    }
-
-    if (is_neighbouring_player(pos, player_cell)) {
-      append(player_neighbouring_blocks, i)
-    }
-  }
-}
-
 main :: proc() {
   spall_ctx = spall.context_create("trace.spall")
   defer spall.context_destroy(&spall_ctx)
@@ -294,13 +224,13 @@ main :: proc() {
   player_neighbouring_blocks: [dynamic]int = {}
   defer delete(player_neighbouring_blocks)
 
-  blocks: Blocks = {
+  blocks: Chunk = {
     positions = {},
     colors    = {},
   }
   block_transforms: [NUMBER_OF_BLOCKS]rl.Matrix = {}
-  generate_blocks(
-    blocks = &blocks,
+  generate_chunk(
+    chunk = &blocks,
     block_transforms = block_transforms[:],
     player_neighbouring_blocks = &player_neighbouring_blocks,
     player_cell = player_cell,
@@ -396,7 +326,7 @@ main :: proc() {
     player_cell := get_cell_of_block(player_unit.position)
 
     {
-      spall.SCOPED_EVENT(&spall_ctx, &spall_buffer, "draw_blocks")
+      spall.SCOPED_EVENT(&spall_ctx, &spall_buffer, "draw_chunk")
       // raylib uplaods block_transforms to the locs[MATRIX_MODEL]
       rl.DrawMeshInstanced(
         blocks_mesh,
@@ -407,6 +337,7 @@ main :: proc() {
     }
 
     {
+
       spall.SCOPED_EVENT(&spall_ctx, &spall_buffer, "neighbour_check")
       for b_pos, i in blocks.positions {
         if is_neighbouring_player(b_pos, player_cell) {
